@@ -338,8 +338,8 @@ def cal_dashboard(events: list[dict] | None, notes: list[dict] | None):
         # Pad the daily notes under a heading
         if day["notes"]:
             yield Text.from_markup("[bold italic]Daily Notes:[/bold italic]")
-        yield Padding(display_items(day["notes"], "daily_notes", current_date), (0, 0, 0, 2))
-        yield Text()
+            yield Padding(display_items(day["notes"], "daily_notes", current_date), (0, 0, 0, 2))
+            yield Text()
 
         # And show the events as the primary component
         yield display_items(day["events"], "events", current_date)
@@ -354,7 +354,10 @@ def build_dashboards(json: dict, current_date: date):
     dashboards = {}
     # Events and daily notes get combined into a special day-by-day dashboard
     if json["events"] or json["daily_notes"]:
-        dashboards["cal"] = cal_dashboard(json["events"], json["daily_notes"])
+        dashboards["cal"] = Group(
+            Text.from_markup("[bold underline]Calendar[/bold underline]", justify="center"),
+            cal_dashboard(json["events"], json["daily_notes"])
+        )
 
     if json["tickles"]:
         dashboards["tickles"] = Group(
