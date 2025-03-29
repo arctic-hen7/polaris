@@ -332,7 +332,7 @@ def cal_dashboard(events: list[dict] | None, notes: list[dict] | None):
 
     # Display the data one day at a time (guaranteed to be in order because order is
     # maintained from insertion and Polaris returns them in order)
-    for date, day in dailies.items():
+    for idx, [date, day] in enumerate(dailies.items()):
         yield Text.from_markup(f"[bold underline]{date.strftime('%A, %B %d')}[/bold underline]")
 
         # Pad the daily notes under a heading
@@ -344,6 +344,9 @@ def cal_dashboard(events: list[dict] | None, notes: list[dict] | None):
         # And show the events as the primary component
         yield display_items(day["events"], "events", current_date)
 
+        if idx != len(dailies):
+            yield Text()
+
 def build_dashboards(json: dict, current_date: date):
     """
     Converts the given action item data from Polaris into a series of displayable objects. This
@@ -353,43 +356,43 @@ def build_dashboards(json: dict, current_date: date):
 
     dashboards = {}
     # Events and daily notes get combined into a special day-by-day dashboard
-    if json["events"] or json["daily_notes"]:
+    if json["events"] is not None or json["daily_notes"] is not None:
         dashboards["cal"] = Group(
             Text.from_markup("[bold underline]Calendar[/bold underline]", justify="center"),
             cal_dashboard(json["events"], json["daily_notes"])
         )
 
-    if json["tickles"]:
+    if json["tickles"] is not None:
         dashboards["tickles"] = Group(
             Text.from_markup("[bold underline]Tickles[/bold underline]", justify="center"),
             display_items(json["tickles"], "tickles", current_date)
         )
 
-    if json["person_dates"]:
+    if json["person_dates"] is not None:
         dashboards["person_dates"] = Group(
             Text.from_markup("[bold underline]Important Dates[/bold underline]", justify="center"),
             display_items(json["person_dates"], "person_dates", current_date)
         )
 
-    if json["hard_tasks"]:
+    if json["hard_tasks"] is not None:
         dashboards["hard_tasks"] = Group(
             Text.from_markup("[bold underline]Hard Tasks[/bold underline]", justify="center"),
             display_items(json["hard_tasks"], "tasks", current_date)
         )
 
-    if json["easy_tasks"]:
+    if json["easy_tasks"] is not None:
         dashboards["easy_tasks"] = Group(
             Text.from_markup("[bold underline]Easy Tasks[/bold underline]", justify="center"),
             display_items(json["easy_tasks"], "tasks", current_date)
         )
 
-    if json["projects"]:
+    if json["projects"] is not None:
         dashboards["projects"] = Group(
             Text.from_markup("[bold underline]Projects[/bold underline]", justify="center"),
             display_items(json["projects"], "projects", current_date)
         )
 
-    if json["waitings"]:
+    if json["waitings"] is not None:
         dashboards["waitings"] = Group(
             Text.from_markup("[bold underline]Waiting Items[/bold underline]", justify="center"),
             display_items(json["waitings"], "waitings", current_date)
@@ -402,7 +405,7 @@ def build_dashboards(json: dict, current_date: date):
     #         display_items(json["crunch_points"], "crunch_points", current_date)
     #     )
 
-    if json["target_contexts"]:
+    if json["target_contexts"] is not None:
         dashboards["target_contexts"] = Group(
             Text.from_markup("[bold underline]Urgent Contexts[/bold underline]", justify="center"),
             display_items(json["target_contexts"], "target_contexts", current_date)
@@ -418,11 +421,11 @@ if __name__ == "__main__":
     # dates in a single column)
     ALIGNMENTS = {
         # Past dashboard
-        "cal,dates,tickles,waiting": [["cal", "dates"], ["tickles", "waiting"]],
+        "cal,person_dates,tickles,waitings": [["cal", "person_dates"], ["tickles", "waitings"]],
         # Day dashboard
-        "cal,dates,easy_tasks,hard_tasks": [["cal", "dates"], ["hard_tasks", "easy_tasks"]],
+        "cal,easy_tasks,hard_tasks,person_dates": [["cal", "person_dates"], ["hard_tasks", "easy_tasks"]],
         # Week dashboard
-        "cal,dates,easy_tasks,hard_tasks,tickles,waiting": [["cal", "dates", "tickles"], ["waiting", "hard_tasks", "easy_tasks"]]
+        "cal,easy_tasks,hard_tasks,person_dates,tickles,waitings": [["cal", "person_dates", "tickles"], ["waitings", "hard_tasks", "easy_tasks"]]
     }
 
     current_date = datetime.strptime(sys.argv[1], "%Y-%m-%d") if len(sys.argv) > 1 else datetime.now().date()
@@ -430,6 +433,7 @@ if __name__ == "__main__":
 
     # Get a string like `cal,tasks` saying which dashboards are available (sorted for determinism)
     available_dashboards = ",".join(sorted(dashboards.keys()))
+    print(available_dashboards)
     # Use that to figure out the alignment we should take, or just print them in order of
     # insertion
     if available_dashboards in ALIGNMENTS:
