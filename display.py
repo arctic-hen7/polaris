@@ -368,10 +368,16 @@ def build_dashboards(json: dict, current_date: date):
             display_items(json["person_dates"], "person_dates", current_date)
         )
 
-    if json["tasks"]:
-        dashboards["tasks"] = Group(
-            Text.from_markup("[bold underline]Tasks[/bold underline]", justify="center"),
-            display_items(json["tasks"], "tasks", current_date)
+    if json["hard_tasks"]:
+        dashboards["hard_tasks"] = Group(
+            Text.from_markup("[bold underline]Hard Tasks[/bold underline]", justify="center"),
+            display_items(json["hard_tasks"], "tasks", current_date)
+        )
+
+    if json["easy_tasks"]:
+        dashboards["easy_tasks"] = Group(
+            Text.from_markup("[bold underline]Easy Tasks[/bold underline]", justify="center"),
+            display_items(json["easy_tasks"], "tasks", current_date)
         )
 
     if json["projects"]:
@@ -411,9 +417,9 @@ if __name__ == "__main__":
         # Past dashboard
         "cal,dates,tickles,waiting": [["cal", "dates"], ["tickles", "waiting"]],
         # Day dashboard
-        "cal,dates,tasks": [["cal", "dates"], ["tasks"]],
+        "cal,dates,easy_tasks,hard_tasks": [["cal", "dates"], ["hard_tasks", "easy_tasks"]],
         # Week dashboard
-        "cal,dates,tasks,tickles,waiting": [["cal", "dates", "tickles"], ["waiting", "tasks"]]
+        "cal,dates,easy_tasks,hard_tasks,tickles,waiting": [["cal", "dates", "tickles"], ["waiting", "hard_tasks", "easy_tasks"]]
     }
 
     current_date = datetime.strptime(sys.argv[1], "%Y-%m-%d") if len(sys.argv) > 1 else datetime.now().date()

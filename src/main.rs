@@ -90,7 +90,7 @@ fn main() -> Result<()> {
         .flat_map(PersonDate::from_action_item)
         .filter(|d| d.as_ref().is_ok_and(|d| d.notify_date <= until))
         .collect::<Result<Vec<_>>>()?;
-    let mut tasks = action_items
+    let tasks = action_items
         .values()
         .flat_map(|item| Task::from_action_item(item, &action_items))
         // If we filter with both a scheduled and a deadline date, tasks with either should appear,
@@ -164,7 +164,7 @@ fn main() -> Result<()> {
     };
 
     // Now that we have the crunch points, filter the tasks completely
-    tasks = tasks
+    let (easy_tasks, hard_tasks) = tasks
         .into_iter()
         // Either we allow non-actionable tasks, or this task must be actionable
         .filter(|t| args.next_tasks || t.can_start)
@@ -183,7 +183,7 @@ fn main() -> Result<()> {
                     .all(|(_id, person)| args.people.contains(&person))
                     && !t.people.is_empty())
         })
-        .collect();
+        .partition(|t| t.effort <= Effort::Low);
 
     let mut final_data = FinalData {
         events: args.events.then_some(events),
@@ -192,7 +192,8 @@ fn main() -> Result<()> {
         person_dates: args.dates.then_some(person_dates),
         waitings: args.waits.then_some(waitings),
         projects: args.projects.then_some(projects),
-        tasks: args.tasks.then_some(tasks),
+        easy_tasks: (args.tasks || args.easy_tasks).then_some(easy_tasks),
+        hard_tasks: (args.tasks || args.hard_tasks).then_some(hard_tasks),
         crunch_points,
         target_contexts,
     };
@@ -235,7 +236,17 @@ fn main() -> Result<()> {
             )
         });
     }
-    if let Some(tasks) = final_data.tasks.as_mut() {
+    if let Some(tasks) = final_data.easy_tasks.as_mut() {
+        tasks.sort_unstable_by_key(|t| {
+            (
+                t.scheduled.unwrap_or(t.deadline.unwrap_or(post_until)),
+                t.deadline.unwrap_or(post_until),
+                t.priority,
+                t.title.clone(),
+            )
+        });
+    }
+    if let Some(tasks) = final_data.hard_tasks.as_mut() {
         tasks.sort_unstable_by_key(|t| {
             (
                 t.scheduled.unwrap_or(t.deadline.unwrap_or(post_until)),
@@ -252,7 +263,6 @@ fn main() -> Result<()> {
         std::io::stdout().flush()?;
     } else {
         println!("{}", serde_json::to_string(&final_data)?);
-        unreachable!()
     }
 
     Ok(())
@@ -265,7 +275,8 @@ struct FinalData {
     daily_notes: Option<Vec<DailyNote>>,
     tickles: Option<Vec<Tickle>>,
     person_dates: Option<Vec<PersonDate>>,
-    tasks: Option<Vec<Task>>,
+    easy_tasks: Option<Vec<Task>>,
+    hard_tasks: Option<Vec<Task>>,
     projects: Option<Vec<Project>>,
     waitings: Option<Vec<Waiting>>,
     crunch_points: Option<CrunchPoints>,

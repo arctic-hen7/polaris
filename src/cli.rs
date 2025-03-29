@@ -31,8 +31,19 @@ pub struct Cli {
     #[arg(short, long)]
     pub projects: bool,
     /// Include tasks in the output
-    #[arg(short, long)]
+    #[arg(
+        short,
+        long,
+        conflicts_with = "easy_tasks",
+        conflicts_with = "hard_tasks"
+    )]
     pub tasks: bool,
+    /// Include low/minimal-effort tasks in the output
+    #[arg(long)]
+    pub easy_tasks: bool,
+    /// Include tasks with an effort greater than or equal to medium in the output
+    #[arg(long)]
+    pub hard_tasks: bool,
     /// Include non-actionable tasks in the output
     #[arg(long)]
     pub next_tasks: bool,
