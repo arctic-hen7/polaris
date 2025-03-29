@@ -35,8 +35,9 @@ fn main() -> Result<()> {
 
     // The last date at which we'll look at everything is a bit after the last day we'll display
     // things for so we catch non-actionable tasks and are able to adjust the deadlines of
-    // actionable ones to compensate. A week is usually a good distance.
-    let post_until = until.and_hms_opt(23, 59, 59).unwrap() + Duration::weeks(1);
+    // actionable ones to compensate. A week is usually a good distance to account for long advance
+    // notification times on people-related dates as well.
+    let post_until = until.and_hms_opt(23, 59, 59).unwrap() + Duration::weeks(4);
 
     let raw_nodes = get_raw_action_items(
         NodeOptions {
@@ -49,7 +50,7 @@ fn main() -> Result<()> {
         },
         &args.starling,
     )?;
-    let action_items = normalize_action_items(raw_nodes, &args.done_keywords, until)?;
+    let action_items = normalize_action_items(raw_nodes, &args.done_keywords, post_until.date())?;
 
     // Extract every type of item, regardless of what the caller wants, because this validates
     // everything, and filter to only those within the target range
@@ -216,7 +217,7 @@ fn main() -> Result<()> {
         tickles.sort_unstable_by_key(|t| (t.date, t.title.clone()));
     }
     if let Some(person_dates) = final_data.person_dates.as_mut() {
-        person_dates.sort_unstable_by_key(|pd| (pd.date, pd.title.clone()));
+        person_dates.sort_unstable_by_key(|pd| (pd.notify_date, pd.date, pd.title.clone()));
     }
     if let Some(waitings) = final_data.waitings.as_mut() {
         waitings.sort_unstable_by_key(|w| {
