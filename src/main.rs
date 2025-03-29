@@ -101,8 +101,9 @@ fn main() -> Result<()> {
         // them, that's fine, *unless* `force_match` is set.
         .filter(|t| {
             t.as_ref().is_ok_and(|i| {
-                meets_dt(i.scheduled, args.scheduled, args.force_match)
-                    && meets_dt(i.deadline, args.deadline, args.force_match)
+                meets_dt(i.scheduled, args.scheduled)
+                    && meets_dt(i.deadline, args.deadline)
+                    && (!args.force_match || i.scheduled.is_some() || i.deadline.is_some())
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -111,8 +112,9 @@ fn main() -> Result<()> {
         .flat_map(|item| Project::from_action_item(item, &action_items))
         .filter(|p| {
             p.as_ref().is_ok_and(|i| {
-                meets_dt(i.scheduled, args.scheduled, args.force_match)
-                    && meets_dt(i.deadline, args.deadline, args.force_match)
+                meets_dt(i.scheduled, args.scheduled)
+                    && meets_dt(i.deadline, args.deadline)
+                    && (!args.force_match || i.scheduled.is_some() || i.deadline.is_some())
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -121,8 +123,9 @@ fn main() -> Result<()> {
         .flat_map(|item| Waiting::from_action_item(item, &action_items))
         .filter(|w| {
             w.as_ref().is_ok_and(|i| {
-                meets_dt(i.scheduled, args.scheduled, args.force_match)
-                    && meets_dt(i.deadline, args.deadline, args.force_match)
+                meets_dt(i.scheduled, args.scheduled)
+                    && meets_dt(i.deadline, args.deadline)
+                    && (!args.force_match || i.scheduled.is_some() || i.deadline.is_some())
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -291,13 +294,11 @@ struct FinalData {
 /// does *not* have a date, it will return true if `force_match` is false, and false if it is true.
 /// That is, when `force_match` is set, items without dates will not be allowed, whereas when it's
 /// not, they will be.
-fn meets_dt(
-    item_dt: Option<NaiveDateTime>,
-    imposed_date: Option<NaiveDate>,
-    force_match: bool,
-) -> bool {
-    imposed_date.is_none()
-        || item_dt.map_or(!force_match, |item_dt| {
-            item_dt.date() <= imposed_date.unwrap()
-        })
+fn meets_dt(item_dt: Option<NaiveDateTime>, imposed_date: Option<NaiveDate>) -> bool {
+    imposed_date.is_none() || item_dt.is_none() || item_dt.unwrap().date() <= imposed_date.unwrap()
+
+    // imposed_date.is_none()
+    //     || item_dt.map_or(!force_match, |item_dt| {
+    //         item_dt.date() <= imposed_date.unwrap()
+    //     })
 }
