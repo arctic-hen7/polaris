@@ -12,9 +12,9 @@ pub struct Cli {
     /// Include events in the output
     #[arg(short, long)]
     pub events: bool,
-    /// Disables daily note events in the output
+    /// Enables daily note events in the output
     #[arg(long)]
-    pub no_daily_note_events: bool,
+    pub daily_note_events: bool,
     /// Include daily notes in the output
     #[arg(short = 'n', long)]
     pub daily_notes: bool,
@@ -83,7 +83,7 @@ pub struct Cli {
 }
 
 #[derive(Parser)]
-#[group(required = true, multiple = false)]
+#[group(multiple = false)]
 pub struct EncodingOptions {
     /// Encode the result as JSON
     #[arg(long)]

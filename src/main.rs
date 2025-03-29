@@ -128,7 +128,7 @@ fn main() -> Result<()> {
         .collect::<Result<Vec<_>>>()?;
 
     // Insert events for each day where there's at least one daily note
-    if !args.no_daily_note_events {
+    if args.daily_note_events {
         events.extend(DailyNote::notes_to_events(daily_notes.iter()));
     }
 
@@ -246,13 +246,12 @@ fn main() -> Result<()> {
         });
     }
 
-    if args.encoding.json {
-        println!("{}", serde_json::to_string(&final_data)?);
-    } else if args.encoding.bincode {
+    if args.encoding.bincode {
         let bytes = bincode::serialize(&final_data)?;
         std::io::stdout().write_all(&bytes)?;
         std::io::stdout().flush()?;
     } else {
+        println!("{}", serde_json::to_string(&final_data)?);
         unreachable!()
     }
 
