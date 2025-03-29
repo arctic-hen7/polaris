@@ -433,7 +433,6 @@ if __name__ == "__main__":
 
     # Get a string like `cal,tasks` saying which dashboards are available (sorted for determinism)
     available_dashboards = ",".join(sorted(dashboards.keys()))
-    print(available_dashboards)
     # Use that to figure out the alignment we should take, or just print them in order of
     # insertion
     if available_dashboards in ALIGNMENTS:

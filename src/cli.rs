@@ -63,9 +63,16 @@ pub struct Cli {
     /// The last deadline date to show (only affects tasks, projects, and waiting items)
     #[arg(long)]
     pub deadline: Option<NaiveDate>,
-    /// Force matches for scheduled/deadline dates (i.e. items without them won't be shown at all)
+    /// Force matches for scheduled or deadline dates (i.e. items without one of them won't be
+    /// shown at all)
     #[arg(long)]
     pub force_match: bool,
+    /// Force matches for scheduled dates (i.e. items without them won't be shown at all)
+    #[arg(long, conflicts_with = "force_match", requires = "scheduled")]
+    pub force_scheduled: bool,
+    /// Force matches for deadline dates (i.e. items without them won't be shown at all)
+    #[arg(long, conflicts_with = "force_match", requires = "deadline")]
+    pub force_deadline: bool,
 
     /// The contexts we have, which will filter to only tasks where all their required contexts are
     /// present (tasks with no contexts will not be shown here)
