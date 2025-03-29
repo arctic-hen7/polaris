@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// estimate in advance when busy periods are upcoming.
 #[derive(Serialize)]
 pub struct CrunchPoints {
-    inner: HashMap<NaiveDate, u32>,
+    pub inner: HashMap<NaiveDate, u32>,
 }
 impl CrunchPoints {
     /// Creates a new, empty set of crunch points.

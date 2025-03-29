@@ -210,7 +210,7 @@ pub struct BaseActionItem {
 /// Information about a single repeat of an action item. The only things that guide a repeat are
 /// the scheduled, deadline, and primary timestamps, so we only need to store those for each
 /// repeat.
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct ActionItemRepeat {
     /// The primary timestamp (from the heading).
     pub primary: Option<SimpleTimestamp>,
@@ -221,7 +221,7 @@ pub struct ActionItemRepeat {
 }
 
 /// A simple timestamp, which is always active, and which has no repeater.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Debug)]
 pub struct SimpleTimestamp {
     /// The date and optional time when the timestamp begins.
     pub start: DateTime,
@@ -327,7 +327,7 @@ fn people_from_node(node: &Node) -> Result<Vec<(Uuid, String)>> {
                 )?;
 
                 // A convention in my personal systems for people nodes
-                let name = name.strip_suffix("(Person) ").unwrap_or(&name).to_string();
+                let name = name.strip_prefix("(Person) ").unwrap_or(&name).to_string();
 
                 Ok::<_, anyhow::Error>((id, name))
             })

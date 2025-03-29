@@ -54,10 +54,6 @@ fn main() -> Result<()> {
 
     // Extract every type of item, regardless of what the caller wants, because this validates
     // everything, and filter to only those within the target range
-    let meets_dt = |imposed_dt: NaiveDate, item_dt: Option<NaiveDateTime>| {
-        item_dt.is_some_and(|item_dt| item_dt <= imposed_dt.and_hms_opt(23, 59, 59).unwrap())
-    };
-
     let mut events = action_items
         .values()
         .flat_map(Event::from_action_item)
@@ -99,11 +95,14 @@ fn main() -> Result<()> {
         .flat_map(|item| Task::from_action_item(item, &action_items))
         // If we filter with both a scheduled and a deadline date, tasks with either should appear,
         // we don't require both
+        //
+        // TODO: If we set a scheduled date and the task has it, it must meet it (same for
+        // deadlines), and if both are set it must meet both. *But*, if it doesn't have one of
+        // them, that's fine, *unless* `force_match` is set.
         .filter(|t| {
             t.as_ref().is_ok_and(|i| {
-                (args.deadline.is_none() && args.scheduled.is_none())
-                    || args.deadline.is_some_and(|d| meets_dt(d, i.deadline))
-                    || args.scheduled.is_some_and(|s| meets_dt(s, i.scheduled))
+                meets_dt(i.scheduled, args.scheduled, args.force_match)
+                    && meets_dt(i.deadline, args.deadline, args.force_match)
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -112,9 +111,8 @@ fn main() -> Result<()> {
         .flat_map(|item| Project::from_action_item(item, &action_items))
         .filter(|p| {
             p.as_ref().is_ok_and(|i| {
-                (args.deadline.is_none() && args.scheduled.is_none())
-                    || args.deadline.is_some_and(|d| meets_dt(d, i.deadline))
-                    || args.scheduled.is_some_and(|s| meets_dt(s, i.scheduled))
+                meets_dt(i.scheduled, args.scheduled, args.force_match)
+                    && meets_dt(i.deadline, args.deadline, args.force_match)
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -123,9 +121,8 @@ fn main() -> Result<()> {
         .flat_map(|item| Waiting::from_action_item(item, &action_items))
         .filter(|w| {
             w.as_ref().is_ok_and(|i| {
-                (args.deadline.is_none() && args.scheduled.is_none())
-                    || args.deadline.is_some_and(|d| meets_dt(d, i.deadline))
-                    || args.scheduled.is_some_and(|s| meets_dt(s, i.scheduled))
+                meets_dt(i.scheduled, args.scheduled, args.force_match)
+                    && meets_dt(i.deadline, args.deadline, args.force_match)
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -274,4 +271,23 @@ struct FinalData {
     waitings: Option<Vec<Waiting>>,
     crunch_points: Option<CrunchPoints>,
     target_contexts: Option<Vec<String>>,
+}
+
+/// Determines whether or not a date on an item meets an imposed cutoff (e.g. its deadline is
+/// before the cutoff).
+///
+/// If the imposed date is not present, this will return true. If it is present and the item has a
+/// date as well, it will return true if the item's date is before or on the cutoff. If the item
+/// does *not* have a date, it will return true if `force_match` is false, and false if it is true.
+/// That is, when `force_match` is set, items without dates will not be allowed, whereas when it's
+/// not, they will be.
+fn meets_dt(
+    item_dt: Option<NaiveDateTime>,
+    imposed_date: Option<NaiveDate>,
+    force_match: bool,
+) -> bool {
+    imposed_date.is_none()
+        || item_dt.map_or(!force_match, |item_dt| {
+            item_dt.date() <= imposed_date.unwrap()
+        })
 }
