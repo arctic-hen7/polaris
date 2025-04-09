@@ -10,7 +10,7 @@ pub fn get_raw_action_items(mut opts: NodeOptions, starling_addr: &str) -> Resul
     opts.children = true;
     opts.metadata = true;
 
-    let res = ureq::get(&format!(
+    let mut res = ureq::get(&format!(
         "http://{}/index/action_items/nodes",
         starling_addr
     ))
@@ -27,8 +27,7 @@ pub fn get_raw_action_items(mut opts: NodeOptions, starling_addr: &str) -> Resul
         );
     }
 
-    let body_bytes = res.into_body().read_to_vec()?;
-    bincode::deserialize(&body_bytes)
+    bincode::deserialize_from(res.body_mut().as_reader())
         .with_context(|| "failed to deserialize next actions from starling")
 }
 

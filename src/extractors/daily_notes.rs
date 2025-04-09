@@ -28,26 +28,22 @@ impl DailyNote {
     /// onto the list of daily notes.
     pub fn from_action_item(item: &ActionItem) -> impl Iterator<Item = Result<Self>> + '_ {
         item.base().repeats.iter().filter_map(move |repeat| {
-            if item.base().parent_tags.contains("daily_notes") {
-                if let ActionItem::None { .. } = item {
-                    repeat.primary.as_ref().map(|ts| {
-                        if ts.end.is_some() || ts.start.time.is_some() {
-                            Err(anyhow!(
-                                "daily note {} is not an all-day event",
-                                item.base().id
-                            ))
-                        } else {
-                            Ok(Self {
-                                id: item.base().id,
-                                title: item.base().title.last().cloned().unwrap(),
-                                body: item.base().body.clone(),
-                                date: ts.start.date,
-                            })
-                        }
-                    })
-                } else {
-                    None
-                }
+            if let ActionItem::Note { .. } = item {
+                repeat.primary.as_ref().map(|ts| {
+                    if ts.end.is_some() || ts.start.time.is_some() {
+                        Err(anyhow!(
+                            "daily note {} is not an all-day event",
+                            item.base().id
+                        ))
+                    } else {
+                        Ok(Self {
+                            id: item.base().id,
+                            title: item.base().title.last().cloned().unwrap(),
+                            body: item.base().body.clone(),
+                            date: ts.start.date,
+                        })
+                    }
+                })
             } else {
                 None
             }

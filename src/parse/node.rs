@@ -121,7 +121,7 @@ pub struct NodeConnection {
 }
 
 /// Options that can be used to customize the information returned about a node.
-#[derive(Serialize, Debug, Clone, Copy)]
+#[derive(Serialize, Debug, Clone, Copy, Default)]
 pub struct NodeOptions {
     /// Whether or not to return the body of this node (this may be arbitrarily large).
     #[serde(default)]
@@ -157,4 +157,9 @@ pub struct NodeOptions {
 pub enum Format {
     Markdown,
     Org,
+}
+impl Default for Format {
+    fn default() -> Self {
+        Self::Markdown
+    }
 }

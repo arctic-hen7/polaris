@@ -33,8 +33,7 @@ impl Event {
             let parent_tags = &item.base().parent_tags;
             if parent_tags.contains("person_dates")
                 || parent_tags.contains("tickles")
-                || parent_tags.contains("daily_notes")
-                || matches!(item, ActionItem::Waiting { .. })
+                || matches!(item, ActionItem::Waiting { .. } | ActionItem::Note { .. })
             {
                 None
             } else {
@@ -59,7 +58,7 @@ impl Event {
                         ActionItem::Project { .. } => EventType::Project,
                         ActionItem::None { .. } => EventType::Event,
 
-                        ActionItem::Waiting { .. } => unreachable!(),
+                        ActionItem::Waiting { .. } | ActionItem::Note { .. } => unreachable!(),
                     },
                 })
             }

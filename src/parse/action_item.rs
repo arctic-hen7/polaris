@@ -43,6 +43,7 @@ pub fn node_to_action_item(node: Node, repeats: Vec<ActionItemRepeat>) -> Result
                         .map(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d"))
                         .ok_or(anyhow!("no SENT property on waiting node {}", node.id))??,
                 }),
+                "NOTE" => Ok(ActionItem::Note { base }),
                 "PROJ" => {
                     // Make sure there is at least one actionable item in this project (i.e. one
                     // `TODO`)
@@ -168,6 +169,10 @@ pub enum ActionItem {
         /// The date on which the item was sent (and entered a waiting state).
         sent: NaiveDate,
     },
+    Note {
+        base: BaseActionItem,
+        // We don't store the date because it might have repeats
+    },
     None {
         base: BaseActionItem,
 
@@ -185,6 +190,7 @@ impl ActionItem {
             Self::Task { base, .. }
             | Self::Project { base, .. }
             | Self::Waiting { base, .. }
+            | Self::Note { base, .. }
             | Self::None { base, .. } => base,
         }
     }
