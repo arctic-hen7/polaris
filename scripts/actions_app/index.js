@@ -150,6 +150,7 @@ const displayTask = (task, currentDate) => {
 const formatDate = (dateTime, currentDate) => {
     const date = new Date(dateTime);
     date.setHours(0, 0, 0, 0);
+    currentDate.setHours(0, 0, 0, 0);
     const timeStr = dateTime.toLocaleTimeString(undefined, {
         hour: "2-digit",
         minute: "2-digit",
