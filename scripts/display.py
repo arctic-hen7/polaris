@@ -421,7 +421,7 @@ if __name__ == "__main__":
     # dates in a single column)
     ALIGNMENTS = {
         # Past dashboard
-        "cal,person_dates,tickles,waitings": [["cal", "person_dates"], ["tickles", "waitings"]],
+        "cal,easy_tasks,person_dates,tickles,waitings": [["cal", "person_dates"], ["tickles", "waitings", "easy_tasks"]],
         # Day dashboard
         "cal,easy_tasks,hard_tasks,person_dates": [["cal", "person_dates"], ["hard_tasks", "easy_tasks"]],
         # Week dashboard

@@ -59,7 +59,7 @@ elif sys.argv[1] == "day":
 elif sys.argv[1] == "past":
     date = sys.argv[2] if len(sys.argv) > 2 else datetime.now().strftime("%Y-%m-%d")
 
-    call_and_display([date, "--events", "--daily-notes", "--tickles", "--waits", "--dates", "--scheduled", date, "--deadline", date, "--force-match"])
+    call_and_display([date, "--events", "--daily-notes", "--tickles", "--waits", "--dates", "--easy-tasks", "--scheduled", date, "--deadline", date, "--force-match"])
 elif sys.argv[1] == "week":
     start_date = sys.argv[2] if len(sys.argv) > 2 else datetime.now().strftime("%Y-%m-%d")
     end_date = (datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
