@@ -56,6 +56,9 @@ const displayTargetContexts = (date, currentDate) => {
 
     const targetContexts = {};
     for (const task of tasks) {
+        if (task.scheduled && task.scheduled > date) {
+            continue;
+        }
         if (task.deadline && task.deadline <= date) {
             // If this task has multiple contexts, add it to all those contexts
             for (const ctx of task.contexts) {
@@ -252,6 +255,7 @@ const filter = (contextsArr, peopleArr, maxEffort) => {
 
 // Function called from HTML that runs the filter and displays results.
 const doFilter = (currentDate) => {
+    currentDate.setHours(23, 59, 59, 999);
     // `<select>`, so guaranteed to be right
     const maxEffort = parseInt(document.getElementById("effort").value);
     const contexts = Array.from(
@@ -269,6 +273,9 @@ const doFilter = (currentDate) => {
 
     document.getElementById("tasks").innerHTML = "";
     for (const task of filtered) {
+        if (task.scheduled && task.scheduled > currentDate) {
+            continue;
+        }
         document.getElementById("tasks").innerHTML += displayTask(
             task,
             currentDate,
