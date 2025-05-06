@@ -72,10 +72,12 @@ fn main() -> Result<()> {
     let daily_notes = action_items
         .values()
         .flat_map(DailyNote::from_action_item)
-        .filter(|dn| dn.as_ref().is_ok_and(|dn| dn.date <= until))
+        .filter(|dn| dn.is_err() || dn.as_ref().is_ok_and(|dn| dn.date <= until))
         .filter(|dn| {
-            dn.as_ref()
-                .is_ok_and(|dn| from.is_none_or(|from| dn.date >= from))
+            dn.is_err()
+                || dn
+                    .as_ref()
+                    .is_ok_and(|dn| from.is_none_or(|from| dn.date >= from))
         })
         .collect::<Result<Vec<_>>>()?;
     let tickles = action_items
@@ -83,12 +85,12 @@ fn main() -> Result<()> {
         .flat_map(Tickle::from_action_item)
         // Only filter tickles by the until date (old ones that haven't been completed should still
         // show)
-        .filter(|t| t.as_ref().is_ok_and(|t| t.date <= until))
+        .filter(|t| t.is_err() || t.as_ref().is_ok_and(|t| t.date <= until))
         .collect::<Result<Vec<_>>>()?;
     let person_dates = action_items
         .values()
         .flat_map(PersonDate::from_action_item)
-        .filter(|d| d.as_ref().is_ok_and(|d| d.notify_date <= until))
+        .filter(|d| d.is_err() || d.as_ref().is_ok_and(|d| d.notify_date <= until))
         .collect::<Result<Vec<_>>>()?;
     let tasks = action_items
         .values()
@@ -100,33 +102,36 @@ fn main() -> Result<()> {
         // deadlines), and if both are set it must meet both. *But*, if it doesn't have one of
         // them, that's fine, *unless* `force_match` is set.
         .filter(|t| {
-            t.as_ref().is_ok_and(|i| {
-                meets_dt(i.scheduled, args.scheduled, args.force_scheduled)
-                    && meets_dt(i.deadline, args.deadline, args.force_deadline)
-                    && (!args.force_match || i.scheduled.is_some() || i.deadline.is_some())
-            })
+            t.is_err()
+                || t.as_ref().is_ok_and(|i| {
+                    meets_dt(i.scheduled, args.scheduled, args.force_scheduled)
+                        && meets_dt(i.deadline, args.deadline, args.force_deadline)
+                        && (!args.force_match || i.scheduled.is_some() || i.deadline.is_some())
+                })
         })
         .collect::<Result<Vec<_>>>()?;
     let projects = action_items
         .values()
         .flat_map(|item| Project::from_action_item(item, &action_items))
         .filter(|p| {
-            p.as_ref().is_ok_and(|i| {
-                meets_dt(i.scheduled, args.scheduled, args.force_scheduled)
-                    && meets_dt(i.deadline, args.deadline, args.force_deadline)
-                    && (!args.force_match || i.scheduled.is_some() || i.deadline.is_some())
-            })
+            p.is_err()
+                || p.as_ref().is_ok_and(|i| {
+                    meets_dt(i.scheduled, args.scheduled, args.force_scheduled)
+                        && meets_dt(i.deadline, args.deadline, args.force_deadline)
+                        && (!args.force_match || i.scheduled.is_some() || i.deadline.is_some())
+                })
         })
         .collect::<Result<Vec<_>>>()?;
     let waitings = action_items
         .values()
         .flat_map(|item| Waiting::from_action_item(item, &action_items))
         .filter(|w| {
-            w.as_ref().is_ok_and(|i| {
-                meets_dt(i.scheduled, args.scheduled, args.force_scheduled)
-                    && meets_dt(i.deadline, args.deadline, args.force_deadline)
-                    && (!args.force_match || i.scheduled.is_some() || i.deadline.is_some())
-            })
+            w.is_err()
+                || w.as_ref().is_ok_and(|i| {
+                    meets_dt(i.scheduled, args.scheduled, args.force_scheduled)
+                        && meets_dt(i.deadline, args.deadline, args.force_deadline)
+                        && (!args.force_match || i.scheduled.is_some() || i.deadline.is_some())
+                })
         })
         .collect::<Result<Vec<_>>>()?;
 
