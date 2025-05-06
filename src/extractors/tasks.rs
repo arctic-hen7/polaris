@@ -200,7 +200,7 @@ pub fn compute_from_parent(
                 // tasks (we don't need to change any of our behaviour for waiting items).
                 // If there are some, find the earliest scheduled/deadline date among them,
                 // falling back to the project deadline, if there is one.
-                let mut earliest_imposed_deadline = parent_repeat.deadline;
+                let mut earliest_imposed_deadline = parent_repeat.deadline.min(repeat.deadline);
                 for child_id in child_items {
                     if let ActionItem::Task {
                         can_start: false, ..
