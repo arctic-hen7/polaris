@@ -1,5 +1,5 @@
 use super::{node::Node, ActionItemRepeat, SimpleTimestamp};
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{Datelike, NaiveDate, NaiveTime, Utc};
 use orgish::Timestamp;
 
 /// Expands any timestamps on the given node, repeating them until `until`. This ensures that no
@@ -26,7 +26,20 @@ pub fn expand_timestamps(
         extracted_timestamps.push(None);
     }
 
+    let cutoff_year = Utc::now().date_naive().year() + 2;
+
     extracted_timestamps.into_iter().flat_map(move |ts| {
+        // Detect mistakes like `2205` instead of `2025`
+        if ts
+            .as_ref()
+            .is_some_and(|ts| ts.start.date.year() > cutoff_year)
+        {
+            eprintln!(
+                "node {} has a timestamp more than two years in the future",
+                node.id
+            );
+        }
+
         RepeatData {
             primary: ts, // If we have a timestamp, use it, otherwise there's no primary timestamp
             scheduled: node.metadata.as_ref().unwrap().scheduled.clone(),
