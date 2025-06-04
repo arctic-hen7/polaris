@@ -84,6 +84,12 @@ pub struct Cli {
     /// The maximum level of effort to show for tasks
     #[arg(long)]
     pub max_effort: Option<String>,
+    /// The minimum priority to show for tasks
+    #[arg(long)]
+    pub min_priority: Option<String>,
+    /// The maximum priority to show for tasks
+    #[arg(long)]
+    pub max_priority: Option<String>,
     /// People to filter by for tasks (showing only tasks where all their required people are
     /// available, tasks with no people will not be shown here)
     #[arg(long = "person")]

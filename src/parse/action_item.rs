@@ -287,12 +287,24 @@ impl Effort {
 #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum Priority {
+    // NOTE: These values are *not* the same as what you'll see in priority tags!! They're used
+    // only to tell the compiler how to order the variants.
     Important = 3,
     High = 2,
     Medium = 1,
     Low = 0,
 }
 impl Priority {
+    /// Converts the given string into a priority, if possible.
+    pub fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "important" | "impt" => Ok(Self::Important),
+            "high" => Ok(Self::High),
+            "medium" | "med" => Ok(Self::Medium),
+            "low" => Ok(Self::Low),
+            p => bail!("unknown priority '{p}'"),
+        }
+    }
     /// Parses a priority from the given node.
     fn from_node(node: &Node) -> Result<Self> {
         match node.metadata.as_ref().unwrap().priority.as_deref() {

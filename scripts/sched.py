@@ -46,6 +46,12 @@ elif sys.argv[1] == "urgent":
 
     # Only show tasks with a deadline
     call_and_display([current_date, "--tasks", "--scheduled", current_date, "--deadline", deadline, "--force-match"])
+elif sys.argv[1] == "impt":
+    num_days_post = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+    deadline = (datetime.now() + timedelta(days=num_days_post)).strftime("%Y-%m-%d")
+
+    # Only show tasks with a deadline
+    call_and_display([current_date, "--tasks", "--scheduled", current_date, "--min-priority", "high"])
 elif sys.argv[1] == "upcoming":
     num_days_post = int(sys.argv[2]) if len(sys.argv) > 2 else 1
     deadline = (datetime.now() + timedelta(days=num_days_post)).strftime("%Y-%m-%d")

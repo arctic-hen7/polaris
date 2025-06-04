@@ -32,6 +32,16 @@ fn main() -> Result<()> {
         .map(|s| Effort::from_str(&s))
         .transpose()?
         .unwrap_or(Effort::Total);
+    let min_priority = args
+        .min_priority
+        .map(|s| Priority::from_str(&s))
+        .transpose()?
+        .unwrap_or(Priority::Low);
+    let max_priority = args
+        .max_priority
+        .map(|s| Priority::from_str(&s))
+        .transpose()?
+        .unwrap_or(Priority::Important);
 
     // The last date at which we'll look at everything is a bit after the last day we'll display
     // things for so we catch non-actionable tasks and are able to adjust the deadlines of
@@ -183,6 +193,7 @@ fn main() -> Result<()> {
                 || (t.contexts.iter().all(|c| args.contexts.contains(c)) && !t.contexts.is_empty())
         })
         .filter(|t| t.effort >= min_effort && t.effort <= max_effort)
+        .filter(|t| t.priority >= min_priority && t.priority <= max_priority)
         .filter(|t| {
             args.people.is_empty()
                 || (t
