@@ -2,13 +2,15 @@
 # Displays the given Polaris content.
 
 from datetime import date, datetime
-from rich.console import Group, group
+from typing import Literal, Tuple
+from rich.console import Console, Group, group
 from rich.markdown import Markdown, TextElement
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich import print as rich_print
+import re
 
 class DisplayAdditional:
     """
@@ -198,7 +200,6 @@ def transform_item(item, ty):
             people=item["people"],
         )
     elif ty == "projects":
-        # TODO: Display subtasks and waiting items? Only if needed
         return DisplayItem(
             title=item["title"],
             body=item["body"],
@@ -222,16 +223,8 @@ def transform_item(item, ty):
             time=None,
             people=[],
         )
-    elif ty == "target_contexts":
-        # Date isn't important here, these exist for whatever the requested period was
-        return DisplayItem(
-            title=item.capitalize(),
-            body=None,
-            additionals=[],
-            time=None,
-            people=[],
-        )
     else:
+        # NOTE: Target contexts are handled in `build_dashboards`
         return None
 
 def create_datetime(date_str, time_str=None):
@@ -309,9 +302,11 @@ class LeftJustifiedHeading(TextElement):
         yield Text(f"{' ' * (self.level - 1)}→ {text}")
 
 @group()
-def cal_dashboard(events: list[dict] | None, notes: list[dict] | None):
+def cal_dashboard(items: list[dict], ty: Literal["events"] | Literal["daily_notes"]):
     """
-    Returns a day-by-day dashboard over the given events and notes, if either are present.
+    Returns a day-by-day dashboard over the given events or daily notes. These aren't
+    combined anymore, but they are returned in a date-first dashboard, which is a different
+    format from the other data types.
     """
 
     # For events and daily notes, the current date doesn't matter
@@ -319,30 +314,22 @@ def cal_dashboard(events: list[dict] | None, notes: list[dict] | None):
 
     # Collect everything on a per-day basis
     dailies = {}
-    for event in events or []:
-        event_date = datetime.strptime(event["timestamp"]["start"]["date"], "%Y-%m-%d").date()
-        if event_date not in dailies:
-            dailies[event_date] = {"events": [], "notes": []}
-        dailies[event_date]["events"].append(event)
-    for note in notes or []:
-        note_date = datetime.strptime(note["date"], "%Y-%m-%d").date()
-        if note_date not in dailies:
-            dailies[note_date] = {"events": [], "notes": []}
-        dailies[note_date]["notes"].append(note)
+    for item in items:
+        # Events get proper timestamps, daily notes just have a marker for which day they're on
+        if ty == "events":
+            date = datetime.strptime(item["timestamp"]["start"]["date"], "%Y-%m-%d").date()
+        elif ty == "daily_notes":
+            date = datetime.strptime(item["date"], "%Y-%m-%d").date()
+
+        if date not in dailies:
+            dailies[date] = []
+        dailies[date].append(item)
 
     # Display the data one day at a time (guaranteed to be in order because order is
     # maintained from insertion and Polaris returns them in order)
     for idx, [date, day] in enumerate(dailies.items()):
         yield Text.from_markup(f"[bold underline]{date.strftime('%A, %B %d')}[/bold underline]")
-
-        # Pad the daily notes under a heading
-        if day["notes"]:
-            yield Text.from_markup("[bold italic]Daily Notes:[/bold italic]")
-            yield Padding(display_items(day["notes"], "daily_notes", current_date), (0, 0, 0, 2))
-            yield Text()
-
-        # And show the events as the primary component
-        yield display_items(day["events"], "events", current_date)
+        yield display_items(day, ty, current_date)
 
         if idx != len(dailies):
             yield Text()
@@ -352,100 +339,132 @@ def build_dashboards(json: dict, current_date: date):
     Converts the given action item data from Polaris into a series of displayable objects. This
     will produce a context-aware panel for each section of data that's available in the output,
     doing logical things like combining the events and daily notes into day-by-day sections.
+
+    Each value of the returned object will be a tuple of a position string and
+    an actual renderable.
     """
 
-    dashboards = {}
-    # Events and daily notes get combined into a special day-by-day dashboard
-    if json["events"] is not None or json["daily_notes"] is not None:
-        dashboards["cal"] = Group(
-            Text.from_markup("[bold underline]Calendar[/bold underline]", justify="center"),
-            cal_dashboard(json["events"], json["daily_notes"])
-        )
+    dashboards = []
 
-    if json["tickles"] is not None:
-        dashboards["tickles"] = Group(
-            Text.from_markup("[bold underline]Tickles[/bold underline]", justify="center"),
-            display_items(json["tickles"], "tickles", current_date)
-        )
+    for view_name_str, view_data_map in json.items():
+        view_name_parts = view_name_str.split("__", 1)
+        view_name = view_name_parts[0]
+        view_pos = view_name_parts[1] if len(view_name_parts) > 1 else None
+        # The data is guaranteed be like `{"events": [..]}`
+        view_data_type, view_data = next(iter(view_data_map.items()))
+        if view_data_type == "events" or view_data_type == "daily_notes":
+            displayed = cal_dashboard(view_data, view_data_type)
+        elif view_data_type == "target_contexts":
+            # For target contexts, we need to display an independent mini-dashboard
+            # for every context
+            context_minis = []
+            for i, context_data in enumerate(sorted(view_data.items(), key=lambda x: x[0])):
+                context, tasks = context_data
+                context_minis.append((context, Group(
+                    # Title for the context
+                    Text.from_markup(f"[bold]{context.replace('_', ' ').capitalize()}[/bold]", justify="center"),
+                    Text(),
+                    display_items(tasks, "tasks", current_date),
+                    Text() if i != len(view_data) - 1 else Group()
+                )))
 
-    if json["person_dates"] is not None:
-        dashboards["person_dates"] = Group(
-            Text.from_markup("[bold underline]Important Dates[/bold underline]", justify="center"),
-            display_items(json["person_dates"], "person_dates", current_date)
-        )
+            context_dashboards = [t[1] for t in context_minis]
+            displayed = Group(*context_dashboards)
+        else:
+            displayed = display_items(view_data, view_data_type, current_date)
 
-    if json["hard_tasks"] is not None:
-        dashboards["hard_tasks"] = Group(
-            Text.from_markup("[bold underline]Hard Tasks[/bold underline]", justify="center"),
-            display_items(json["hard_tasks"], "tasks", current_date)
-        )
-
-    if json["easy_tasks"] is not None:
-        dashboards["easy_tasks"] = Group(
-            Text.from_markup("[bold underline]Easy Tasks[/bold underline]", justify="center"),
-            display_items(json["easy_tasks"], "tasks", current_date)
-        )
-
-    if json["projects"] is not None:
-        dashboards["projects"] = Group(
-            Text.from_markup("[bold underline]Projects[/bold underline]", justify="center"),
-            display_items(json["projects"], "projects", current_date)
-        )
-
-    if json["waitings"] is not None:
-        dashboards["waitings"] = Group(
-            Text.from_markup("[bold underline]Waiting Items[/bold underline]", justify="center"),
-            display_items(json["waitings"], "waitings", current_date)
-        )
-
-    # crunch_points = None
-    # if json["crunch_points"]:
-    #     crunch_points = Group(
-    #         Text.from_markup("[bold underline]crunch_points[/bold underline]", justify="center"),
-    #         display_items(json["crunch_points"], "crunch_points", current_date)
-    #     )
-
-    if json["target_contexts"] is not None:
-        dashboards["target_contexts"] = Group(
-            Text.from_markup("[bold underline]Urgent Contexts[/bold underline]", justify="center"),
-            display_items(json["target_contexts"], "target_contexts", current_date)
-        )
+        dashboards.append(PositionedDashboard(Panel(
+            # Text.from_markup(f"[bold underline]{view_name}[/bold underline]", justify="center"),
+            displayed, title=view_name, expand=False
+        ), view_name, view_pos))
+        # TODO: What about when we *don't* have positions?
 
     return dashboards
+
+def get_renderable_height(renderable):
+    """
+    Returns the height of the given renderable, computed with a virtual console.
+    This will be relative to the width of the true console.
+    """
+    virtual_console = Console(width=Console().width, record=True, file=None)
+    lines = virtual_console.render_lines(renderable, virtual_console.options, pad=False)
+
+    return len(lines)
+
+# This support column-spanning, which we don't generally support yet
+POS_RE = re.compile(
+    r"r:(?P<rs>\d+)(?:/(?P<re>\d+))?\s*;\s*c:(?P<cs>\d+)(?:/(?P<ce>\d+))?",
+    flags=re.I,
+)
+def parse_pos(pos_str: str) -> Tuple[int, int, int, int]:
+    """
+    Parses the given position string (e.g. `r:1/3;c:2`) into a tuple of the starting
+    row, ending row, starting column, and ending column. This will also perform
+    elementary validation to ensure there aren't things like negative spans.
+
+    All indices begin at zero in the output, but at one in the input!
+    """
+    m = POS_RE.fullmatch(pos_str.strip())
+    if not m:
+        raise ValueError(f"malformed position string: {pos_str!r}")
+
+    row_start = int(m.group("rs")) - 1  # -1 => zero-based
+    row_end = m.group("re")
+    row_end = int(row_end) - 1 if row_end else row_start
+
+    col_start = int(m.group("cs")) - 1
+    col_end = m.group("ce")
+    col_end = int(col_end) - 1 if col_end else col_start
+
+    if row_start > row_end or col_start > col_end:
+        raise ValueError(f"negative (backwards) span in {pos_str}")
+
+    return row_start, row_end, col_start, col_end
+
+class PositionedDashboard:
+    """
+    An all-in-one representation of a dashboard with a position in rows and columns that
+    it will occupy in the final layout.
+    """
+
+    __slots__ = ("renderable", "row_start", "row_end", "col_start", "col_end", "height", "name")
+
+    def __init__(self, renderable, name, pos: str):
+        self.renderable = renderable
+        self.name = name
+
+        self.row_start, self.row_end, self.col_start, self.col_end = parse_pos(pos)
+        self.height = get_renderable_height(renderable)
+
+def build_layout(dashboards: list[PositionedDashboard]) -> Table:
+    n_cols = max(d.col_end for d in dashboards) + 1
+
+    # Accumulate the dashboards into column buckets (and ban column spanning)
+    dashboards_by_col = {}
+    for dashboard in dashboards:
+        if dashboard.col_start != dashboard.col_end:
+            raise ValueError(f"dashboard {dashboard.name} spans multiple columns, which is not (yet) supported")
+        dashboards_by_col[dashboard.col_start] = dashboards_by_col.get(dashboard.col_start, []) + [dashboard]
+    # Now sort them so we'll go through each column in row order (row spanning is handled implicitly here)
+    dashboards_by_col = {k: sorted(v, key=lambda d: d.row_start) for k, v in dashboards_by_col.items()}
+
+    root = Table.grid()
+    cols = []
+    for col_idx in range(n_cols):
+        col = Table.grid()
+        for row_dashboard in dashboards_by_col.get(col_idx, []):
+            col.add_row(row_dashboard.renderable)
+        cols.append(col)
+    root.add_row(*cols)
+
+    return root
 
 if __name__ == "__main__":
     import json
     import sys
 
-    # Known alignments, specified as rows of columns (e.g. `[["cal", "dates"]]` -> cal above
-    # dates in a single column)
-    ALIGNMENTS = {
-        # Past dashboard
-        "cal,easy_tasks,person_dates,tickles,waitings": [["cal", "person_dates"], ["tickles", "waitings", "easy_tasks"]],
-        # Day dashboard
-        "cal,easy_tasks,hard_tasks,person_dates": [["cal", "person_dates"], ["hard_tasks", "easy_tasks"]],
-        # Week dashboard
-        "cal,easy_tasks,hard_tasks,person_dates,tickles,waitings": [["cal", "person_dates", "tickles"], ["waitings", "hard_tasks", "easy_tasks"]]
-    }
-
     current_date = datetime.strptime(sys.argv[1], "%Y-%m-%d") if len(sys.argv) > 1 else datetime.now().date()
     dashboards = build_dashboards(json.load(sys.stdin), current_date)
 
-    # Get a string like `cal,tasks` saying which dashboards are available (sorted for determinism)
-    available_dashboards = ",".join(sorted(dashboards.keys()))
-    # Use that to figure out the alignment we should take, or just print them in order of
-    # insertion
-    if available_dashboards in ALIGNMENTS:
-        view = Table.grid()
-        columns = []
-        for column in ALIGNMENTS[available_dashboards]:
-            view_col = Table.grid()
-            for row in column:
-                view_col.add_row(Panel(dashboards[row]))
-            columns.append(view_col)
-        view.add_row(*columns)
-
-        rich_print(view)
-    else:
-        for dashboard in dashboards.values():
-            rich_print(dashboard)
+    layout = build_layout(dashboards)
+    rich_print(layout)
