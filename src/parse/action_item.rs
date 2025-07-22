@@ -1,8 +1,9 @@
 use super::node::Node;
 use anyhow::{anyhow, bail, Result};
 use chrono::{NaiveDate, NaiveDateTime};
+use clap::ValueEnum;
 use orgish::timestamp::DateTime;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
@@ -236,7 +237,7 @@ pub struct SimpleTimestamp {
 }
 
 /// The effort a task is estimated to take.
-#[derive(Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum Effort {
     Total = 4,
@@ -284,8 +285,9 @@ impl Effort {
 }
 
 /// The priority of a task or project.
-#[derive(Serialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, ValueEnum, Debug)]
 #[serde(rename_all = "snake_case")]
+#[clap(rename_all = "lowercase")]
 pub enum Priority {
     // NOTE: These values are *not* the same as what you'll see in priority tags!! They're used
     // only to tell the compiler how to order the variants.

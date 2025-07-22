@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::ActionItem;
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{Duration, NaiveDate};
@@ -5,7 +7,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 /// A date associated with a person (e.g. a birthday or anniversary).
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct PersonDate {
     /// The unique ID of the node corresponding to this date.
     pub id: Uuid,
@@ -24,7 +26,10 @@ pub struct PersonDate {
 impl PersonDate {
     /// Converts the given action item into a person date, if its repeats would go in the person
     /// dates list.
-    pub fn from_action_item(item: &ActionItem) -> impl Iterator<Item = Result<Self>> + '_ {
+    pub fn from_action_item<'a, 'm: 'a>(
+        item: &'a ActionItem,
+        _map: &'m HashMap<Uuid, ActionItem>,
+    ) -> impl Iterator<Item = Result<Self>> + 'a {
         item.base().repeats.iter().filter_map(move |repeat| {
             if item.base().parent_tags.contains("person_dates") {
                 if let ActionItem::None { properties, people, .. } = item {

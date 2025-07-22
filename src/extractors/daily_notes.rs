@@ -12,7 +12,7 @@ use super::{Event, EventType};
 /// A note to be displayed as something to remember on a specific day.
 ///
 /// These are different from tasks, they're more like little notes to oneself.
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct DailyNote {
     /// The ID of the node corresponding to this daily note.
     pub id: Uuid,
@@ -26,7 +26,10 @@ pub struct DailyNote {
 impl DailyNote {
     /// Converts the given action item into a list of daily notes, if the item's repeats would go
     /// onto the list of daily notes.
-    pub fn from_action_item(item: &ActionItem) -> impl Iterator<Item = Result<Self>> + '_ {
+    pub fn from_action_item<'a, 'm: 'a>(
+        item: &'a ActionItem,
+        _map: &'m HashMap<Uuid, ActionItem>,
+    ) -> impl Iterator<Item = Result<Self>> + 'a {
         item.base().repeats.iter().filter_map(move |repeat| {
             if let ActionItem::Note { .. } = item {
                 repeat.primary.as_ref().map(|ts| {

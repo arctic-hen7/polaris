@@ -11,7 +11,7 @@ use uuid::Uuid;
 ///
 /// Tasks with their own timestamps, or tasks which are part of projects with timestamps, will not
 /// appear here, as they're considered handled. Non-actionable tasks, however, will.
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Task {
     /// The ID of the node corresponding to this task.
     pub id: Uuid,

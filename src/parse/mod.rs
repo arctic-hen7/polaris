@@ -1,5 +1,6 @@
 mod action_item;
 mod fetch;
+mod goals;
 mod node;
 mod repeat;
 

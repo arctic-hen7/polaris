@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::ActionItem;
 use anyhow::{anyhow, Result};
 use chrono::NaiveDate;
@@ -9,7 +11,7 @@ use uuid::Uuid;
 ///
 /// Note that these should not be used for things to be remembered on a certain day (daily notes)
 /// or for things being waited on (waiting-for items).
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Tickle {
     /// The ID of the node associated with this tickle.
     pub id: Uuid,
@@ -22,7 +24,10 @@ pub struct Tickle {
 }
 impl Tickle {
     /// Converts the given action item into a tickle, if its repeats would go in the tickles list.
-    pub fn from_action_item(item: &ActionItem) -> impl Iterator<Item = Result<Self>> + '_ {
+    pub fn from_action_item<'a, 'm: 'a>(
+        item: &'a ActionItem,
+        _map: &'m HashMap<Uuid, ActionItem>,
+    ) -> impl Iterator<Item = Result<Self>> + 'a {
         item.base().repeats.iter().filter_map(move |repeat| {
             if item.base().parent_tags.contains("tickles") {
                 if let ActionItem::None { .. } = item {

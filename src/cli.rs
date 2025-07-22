@@ -1,118 +1,200 @@
-use chrono::NaiveDate;
-use clap::Parser;
+use crate::views::{AllViews, View};
+use anyhow::{bail, Context, Error};
+use clap::{Parser, ValueEnum};
+use std::{collections::HashMap, ops::Deref, path::PathBuf, str::FromStr};
 
-#[derive(Parser)]
+/// Polaris, the ultimate scheduling tool.
+#[derive(Parser, Debug)]
 pub struct Cli {
-    /// The date range over which action items should be shown; if one value, it's interpreted as
-    /// `until`, if two, it's `from` and `until` (a starting date only affects events and daily
-    /// notes, and neither date affects tasks, projects, and waiting items)
-    #[arg(value_names = &["from", "until"], num_args=1..=2, required = true)]
-    pub date_range: Vec<NaiveDate>,
+    #[command(flatten)]
+    view_options: ViewOptions,
 
-    /// Include events in the output
-    #[arg(short, long)]
-    pub events: bool,
-    /// Enables daily note events in the output
-    #[arg(long)]
-    pub daily_note_events: bool,
-    /// Include daily notes in the output
-    #[arg(short = 'n', long)]
-    pub daily_notes: bool,
-    /// Include tickles in the output
-    #[arg(short = 'i', long)]
-    pub tickles: bool,
-    /// Include important dates for people in the output
-    #[arg(short, long)]
-    pub dates: bool,
-    /// Include waiting-for items in the output
-    #[arg(short, long)]
-    pub waits: bool,
-    /// Include projects in the output
-    #[arg(short, long)]
-    pub projects: bool,
-    /// Include tasks in the output
-    #[arg(
-        short,
-        long,
-        conflicts_with = "easy_tasks",
-        conflicts_with = "hard_tasks"
-    )]
-    pub tasks: bool,
-    /// Include low/minimal-effort tasks in the output
-    #[arg(long)]
-    pub easy_tasks: bool,
-    /// Include tasks with an effort greater than or equal to medium in the output
-    #[arg(long)]
-    pub hard_tasks: bool,
-    /// Include non-actionable tasks in the output
-    #[arg(long)]
-    pub next_tasks: bool,
-    /// Include crunch points in the output
-    #[arg(long)]
-    pub crunch_points: bool,
-    /// Produce the contexts which will need to be entered to complete all low/minimal-effort tasks
-    /// due up until the given date
-    #[arg(long)]
-    pub target_contexts: Option<NaiveDate>,
-
-    /// The last scheduled date to show (usually the present day, though to show all tasks which
-    /// will appear over a week, set it to the end of the week; only affects tasks, projects, and
-    /// waiting items)
-    #[arg(long)]
-    pub scheduled: Option<NaiveDate>,
-    /// The last deadline date to show (only affects tasks, projects, and waiting items)
-    #[arg(long)]
-    pub deadline: Option<NaiveDate>,
-    /// Force matches for scheduled or deadline dates (i.e. items without one of them won't be
-    /// shown at all)
-    #[arg(long)]
-    pub force_match: bool,
-    /// Force matches for scheduled dates (i.e. items without them won't be shown at all)
-    #[arg(long, conflicts_with = "force_match", requires = "scheduled")]
-    pub force_scheduled: bool,
-    /// Force matches for deadline dates (i.e. items without them won't be shown at all)
-    #[arg(long, conflicts_with = "force_match", requires = "deadline")]
-    pub force_deadline: bool,
-
-    /// The contexts we have, which will filter to only tasks where all their required contexts are
-    /// present (tasks with no contexts will not be shown here)
-    #[arg(short, long)]
-    pub contexts: Vec<String>,
-    /// The minimum level of effort to show for tasks
-    #[arg(long)]
-    pub min_effort: Option<String>,
-    /// The maximum level of effort to show for tasks
-    #[arg(long)]
-    pub max_effort: Option<String>,
-    /// The minimum priority to show for tasks
-    #[arg(long)]
-    pub min_priority: Option<String>,
-    /// The maximum priority to show for tasks
-    #[arg(long)]
-    pub max_priority: Option<String>,
-    /// People to filter by for tasks (showing only tasks where all their required people are
-    /// available, tasks with no people will not be shown here)
-    #[arg(long = "person")]
-    pub people: Vec<String>,
-
-    /// The completion keywords to use
+    /// Completion keywords to recognise and exclude from the action items.
     #[arg(long, default_values_t = vec!["DONE".to_string(), "CONT".to_string(), "PROB".to_string()])]
     pub done_keywords: Vec<String>,
-    /// The address of the Starling endpoint to use (e.g. `localhost:3000`)
-    #[arg(long, default_value = "localhost:3000")]
-    pub starling: String,
+    /// The address of the Starling endpoint from which to fetch action items.
+    #[arg(long = "starling", default_value = "localhost:3000")]
+    pub starling_address: String,
+    /// Which encoding to output.
+    #[arg(short, long, default_value = "json")]
+    pub encoding: Encoding,
+    /// The amount of time to add after the last date in the views to guide when to stop expanding
+    /// repeating timestamps. If there are no date filters, this will be added to the present date.
+    /// It should be large enough to account for the longest person date notification times in
+    /// particular.
+    #[arg(long, default_value = "8w")]
+    pub repeat_buffer: RepeatBuffer,
+}
+impl Cli {
+    /// Extracts the views from the options, which may involve reading a JSON definition of them.
+    /// If the user has requested help on the views, this will return `Ok(None)`, and the caller
+    /// should exit the process (help is printed automatically). This will group the views by data
+    /// type, and work out the latest date among them.
+    pub fn parse_views(&mut self) -> Result<Option<AllViews>, Error> {
+        // First, get a vector of views, all with different data types
+        let views_vec = if let Some(views_help) = &self.view_options.views_help {
+            NamedView::try_parse_from(
+                std::iter::once("polaris_view").chain(
+                    views_help
+                        .iter()
+                        .map(String::as_str)
+                        .chain(std::iter::once("--help")),
+                ),
+            )?;
+            return Ok(None);
+        } else if !self.view_options.views.is_empty() {
+            Ok::<_, Error>(std::mem::take(&mut self.view_options.views))
+        } else if let Some(json_path) = &self.view_options.views_json {
+            let json_contents = std::fs::read_to_string(json_path)
+                .with_context(|| "failed to read json views file")?;
+            let views: HashMap<String, View> = serde_json::from_str(&json_contents)
+                .with_context(|| "failed to parse json views file")?;
+            let views_vec = views
+                .into_iter()
+                .map(|(name, view)| NamedView { name, view })
+                .collect();
+            Ok(views_vec)
+        } else {
+            // We're guaranteed to have one of them set by `clap`'s parsing rules
+            unreachable!()
+        }?;
 
-    #[command(flatten)]
-    pub encoding: EncodingOptions,
+        // Now organise them by data type
+        let mut all_views = AllViews {
+            events: Vec::new(),
+            daily_notes: Vec::new(),
+            tickles: Vec::new(),
+            dates: Vec::new(),
+            waits: Vec::new(),
+            projects: Vec::new(),
+            tasks: Vec::new(),
+            target_contexts: Vec::new(),
+
+            last_date: None,
+        };
+        for named_view in views_vec {
+            // Validate the view, which will also return the last date in it
+            let last_date = named_view
+                .view
+                .validate()
+                .with_context(|| format!("failed to validate view `{}`", named_view.name))?;
+
+            // Add the view to the appropriate vector
+            match named_view.view {
+                View::Events(filter) => all_views.events.push((named_view.name, filter)),
+                View::DailyNotes(filter) => all_views.daily_notes.push((named_view.name, filter)),
+                View::Tickles(filter) => all_views.tickles.push((named_view.name, filter)),
+                View::Dates(filter) => all_views.dates.push((named_view.name, filter)),
+                View::Waits(filter) => all_views.waits.push((named_view.name, filter)),
+                View::Projects(filter) => all_views.projects.push((named_view.name, filter)),
+                View::Tasks(filter) => all_views.tasks.push((named_view.name, filter)),
+                View::TargetContexts(filter) => {
+                    all_views.target_contexts.push((named_view.name, filter))
+                }
+            }
+
+            // If we have a last date, update it
+            if let Some(last_date) = last_date {
+                if all_views
+                    .last_date
+                    .is_none_or(|latest_date| latest_date < last_date)
+                {
+                    all_views.last_date = Some(last_date);
+                }
+            }
+        }
+
+        // The `Ok(None)` branch was handled in the first section
+        Ok(Some(all_views))
+    }
 }
 
-#[derive(Parser)]
-#[group(multiple = false)]
-pub struct EncodingOptions {
-    /// Encode the result as JSON
-    #[arg(long)]
-    pub json: bool,
-    /// Encode the result with bincode (for other Rust programs)
-    #[arg(long)]
-    pub bincode: bool,
+/// Options that allow the user to pass views directly, with a JSON file (for more complex
+/// configurations), or to get help around how to specify views.
+#[derive(Parser, Debug)]
+#[group(multiple = false, required = true)]
+struct ViewOptions {
+    /// Every one of these will create a new view (e.g. `--view "my_view events -u 2025-01-01"`).
+    /// Within each argument, a separate CLI parse occurs, see help by running `polaris
+    /// --help-views`
+    #[arg(short, long = "view", num_args=1.., value_parser)]
+    views: Vec<NamedView>,
+
+    /// The path to a JSON file declaring the views to use as a map of view names to view options
+    #[arg(short = 'j', long = "views-json")]
+    views_json: Option<PathBuf>,
+
+    /// Produces a help message about how to to specify views on the CLI (you can add a particular
+    /// subcommand after this to get more detailed info)
+    #[arg(long = "help-views", trailing_var_arg = true, num_args = 0..)]
+    views_help: Option<Vec<String>>,
+}
+
+/// The encoding to use for the output of the CLI.
+#[derive(ValueEnum, Clone, Debug)]
+#[clap(rename_all = "lowercase")]
+pub enum Encoding {
+    /// JSON, the default encoding.
+    Json,
+    /// Bincode, which is *much* faster to handle if passing output to another Rust program.
+    Bincode,
+}
+
+/// A wrapper type over the duration buffer which will be added after the last date we detect
+/// across all the views the user specifies. This allows accounting for things like long
+/// notification times on person-related dates, which will only be detected if we expand timestamps
+/// far enough into the future to generate the dates themselves (and then we can work backward to
+/// their notification dates).
+///
+/// This also needs to be long enough to catch deadlines on non-actionable tasks so we can
+/// potentially adjust those on actionable tasks within our window of concern accordingly.
+#[derive(Clone, Debug)]
+pub struct RepeatBuffer(pub chrono::Duration);
+impl FromStr for RepeatBuffer {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // The last character will guide the amount of time
+        let duration = match s.chars().last() {
+            Some('w') => chrono::Duration::weeks(s[..s.len() - 1].parse()?),
+            Some('d') => chrono::Duration::days(s[..s.len() - 1].parse()?),
+            _ => bail!("invalid repeat buffer format, expected a number followed by 'w', 'd', 'h', 'm', or 's'"),
+        };
+        Ok(RepeatBuffer(duration))
+    }
+}
+impl Deref for RepeatBuffer {
+    type Target = chrono::Duration;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// A view with a name, which will be parsed from what is effectively a sub-CLI inside the
+/// `-v/--view` argument.
+#[derive(Parser, Clone, Debug)]
+// #[command(disable_help_flag = true)]
+pub struct NamedView {
+    /// The name of the view to produce, which will be the key in the final output map.
+    name: String,
+
+    #[clap(subcommand)]
+    view: View,
+}
+impl FromStr for NamedView {
+    type Err = clap::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // We split the user's input as a shell would (respecting quotes, that's the only thing
+        // that can cause an error here), and then we parse it directly
+        let parts = shellwords::split(s).map_err(|_| {
+            clap::Error::raw(
+                clap::error::ErrorKind::InvalidValue,
+                "mismatched quotes in view arguments",
+            )
+        })?;
+        let fake_argv = std::iter::once("polaris_view").chain(parts.iter().map(|s| s.as_str()));
+        NamedView::try_parse_from(fake_argv)
+    }
 }

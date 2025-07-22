@@ -12,7 +12,7 @@ use uuid::Uuid;
 /// It is guaranteed that every project will either have at least one actionable task, or at least
 /// one waiting item with a scheduled/deadline date. All items within a project are guaranteed to
 /// have deadlines before the project's deadline.
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Project {
     /// The ID of the node corresponding to this project.
     pub id: Uuid,

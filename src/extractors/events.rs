@@ -1,9 +1,10 @@
 use crate::parse::{ActionItem, SimpleTimestamp};
 use serde::Serialize;
+use std::{collections::HashMap, convert::Infallible};
 use uuid::Uuid;
 
 /// An event, to be held/attended at a specific time.
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Event {
     /// The unique ID of the corresponding node.
     pub id: Uuid,
@@ -26,7 +27,10 @@ pub struct Event {
 }
 impl Event {
     /// Converts the given action item into events, if its repeats would go on the calendar.
-    pub fn from_action_item(item: &ActionItem) -> impl Iterator<Item = Self> + '_ {
+    pub fn from_action_item<'a, 'm: 'a>(
+        item: &'a ActionItem,
+        _map: &'m HashMap<Uuid, ActionItem>,
+    ) -> impl Iterator<Item = Result<Self, Infallible>> + 'a {
         item.base().repeats.iter().filter_map(move |repeat| {
             // No person-related dates, tickles, daily notes, or waiting items are events. This
             // check is the same every time, so should get hoisted out of the loop
@@ -37,29 +41,31 @@ impl Event {
             {
                 None
             } else {
-                repeat.primary.as_ref().map(|ts| Self {
-                    id: item.base().id,
-                    title: item.base().title.last().cloned().unwrap(),
-                    body: item.base().body.clone(),
-                    location: if let ActionItem::None { properties, .. } = item {
-                        properties.get("LOCATION").cloned()
-                    } else {
-                        None
-                    },
-                    people: match item {
-                        ActionItem::Task { people, .. } | ActionItem::None { people, .. } => {
-                            people.clone()
-                        }
-                        _ => Vec::new(),
-                    },
-                    timestamp: ts.clone(),
-                    ty: match item {
-                        ActionItem::Task { .. } => EventType::Task,
-                        ActionItem::Project { .. } => EventType::Project,
-                        ActionItem::None { .. } => EventType::Event,
+                repeat.primary.as_ref().map(|ts| {
+                    Ok(Self {
+                        id: item.base().id,
+                        title: item.base().title.last().cloned().unwrap(),
+                        body: item.base().body.clone(),
+                        location: if let ActionItem::None { properties, .. } = item {
+                            properties.get("LOCATION").cloned()
+                        } else {
+                            None
+                        },
+                        people: match item {
+                            ActionItem::Task { people, .. } | ActionItem::None { people, .. } => {
+                                people.clone()
+                            }
+                            _ => Vec::new(),
+                        },
+                        timestamp: ts.clone(),
+                        ty: match item {
+                            ActionItem::Task { .. } => EventType::Task,
+                            ActionItem::Project { .. } => EventType::Project,
+                            ActionItem::None { .. } => EventType::Event,
 
-                        ActionItem::Waiting { .. } | ActionItem::Note { .. } => unreachable!(),
-                    },
+                            ActionItem::Waiting { .. } | ActionItem::Note { .. } => unreachable!(),
+                        },
+                    })
                 })
             }
         })
@@ -67,7 +73,7 @@ impl Event {
 }
 
 /// The type of an event.
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum EventType {
     /// A task that's been scheduled for a specific time.
