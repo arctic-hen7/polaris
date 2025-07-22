@@ -103,7 +103,6 @@ fn main() -> Result<()> {
     views_data.extend(handle_items!(Task, ViewData::Tasks, &views.tasks));
 
     // Now go through the target contexts and accumulate
-    let mut target_context_views = HashMap::new();
     for name in target_context_view_names {
         // For each target contexts view, we inserted an extra view for the tasks that extracts
         // only those tasks with deadlines on or before the `until` date, so get those now. This is
@@ -125,9 +124,16 @@ fn main() -> Result<()> {
                     .or_insert_with(Vec::new)
                     .push(task.clone());
             }
+            // If a task has no contexts, that's a special area
+            if task.contexts.is_empty() {
+                target_contexts
+                    .entry(String::new())
+                    .or_insert_with(Vec::new)
+                    .push(task.clone());
+            }
         }
 
-        target_context_views.insert(name, ViewData::TargetContexts(target_contexts));
+        views_data.insert(name, ViewData::TargetContexts(target_contexts));
     }
 
     match args.encoding {

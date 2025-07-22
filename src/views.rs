@@ -47,6 +47,7 @@ pub enum View {
     /// completed. Formally, this will go through all tasks with deadlines on or before the given
     /// date, and will produce the list of these tasks, organised by context (if a task has
     /// multiple contexts, it will appear in each context's list).
+    #[command(name = "target_contexts")]
     TargetContexts(TargetContextsFilter),
 }
 impl View {
