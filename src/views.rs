@@ -377,20 +377,23 @@ fn meets_dt(
 /// The type of matching to be performed when filtering by scheduled/deadline dates.
 #[derive(Deserialize, ValueEnum, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-#[clap(rename_all = "lowercase")]
 enum PlanningMatchType {
     /// Show all items not excluded by the scheduled/deadline criteria. This will show items that
     /// have no scheduled/deadline dates as well as those that do.
+    #[clap(name = "all", alias = "any")]
     All,
     /// Show only items that have a scheduled date that matches the given criterion. Items which
     /// would match because they have no scheduled date will not be shown.
+    #[clap(name = "scheduled_only", alias = "force_scheduled")]
     ScheduledOnly,
     /// Show only items that have a deadline date that matches the given criterion. Items which
     /// would match because they have no deadline will not be shown.
+    #[clap(name = "deadline_only", alias = "force_deadline")]
     DeadlineOnly,
     /// Show only items that have either a scheduled date or a deadline date that matches the given
     /// criterion. Items which would match because they have neither a scheduled date nor a
     /// deadline will not be shown, though those that have only one will be.
+    #[clap(name = "scheduled_or_deadline", alias = "either")]
     ScheduledOrDeadline,
 }
 impl Default for PlanningMatchType {
