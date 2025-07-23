@@ -1,13 +1,26 @@
 #!/usr/bin/env python
-# A scheduling script that takes the object of action items from stdin and prints an ICS file
+# A scheduling script that takes an array of action items from stdin and prints an ICS file
 # containing all action items with timestamps. This is intended to be composed with other scripts
 # that filter those items.
 
-import re
 import json
 import sys
 from ics import Calendar, Event
 from datetime import datetime
+from zoneinfo import ZoneInfo
+from tzlocal import get_localzone
+
+LOCAL_TZ = get_localzone()
+UTC_VTIMEZONE = """\
+BEGIN:VTIMEZONE
+TZID:UTC
+BEGIN:STANDARD
+DTSTART:19700101T000000Z
+TZOFFSETFROM:+0000
+TZOFFSETTO:+0000
+END:STANDARD
+END:VTIMEZONE
+"""
 
 def cal_to_ics(events):
     """
@@ -30,6 +43,10 @@ def cal_to_ics(events):
             if event["timestamp"]["end"]["time"]:
                 ts_end = ts_end.replace(hour=int(event["timestamp"]["end"]["time"][:2]), minute=int(event["timestamp"]["end"]["time"][3:5]))
 
+        # Convert to UTC for uniformity
+        ts_start = LOCAL_TZ.localize(ts_start).astimezone(ZoneInfo("UTC"))
+        ts_end = LOCAL_TZ.localize(ts_end).astimezone(ZoneInfo("UTC")) if ts_end else None
+
         ev = Event(
             event["title"],
             begin=ts_start,
@@ -45,14 +62,16 @@ def cal_to_ics(events):
         calendar.events.add(ev)
 
     ics_str = calendar.serialize()
-    # Remove all UTC timezone specifications (in DTSTART and DTEND properties)
-    ics_str = re.sub(r'(DTSTART:\d+T\d+)Z', r'\1', ics_str)
-    ics_str = re.sub(r'(DTEND:\d+T\d+)Z', r'\1', ics_str)
+    # Need to add a VTIMEZONE block for UTC, otherwise GCal freaks out
+    ics_str_with_tz = ics_str.replace(
+        "BEGIN:VCALENDAR\n",
+        "BEGIN:VCALENDAR\n" + UTC_VTIMEZONE + "\n"
+    )
 
-    return ics_str
+    return ics_str_with_tz
 
 if __name__ == "__main__":
     data = json.load(sys.stdin)
 
-    ics_str = cal_to_ics(data["events"])
+    ics_str = cal_to_ics(data)
     print(ics_str)
