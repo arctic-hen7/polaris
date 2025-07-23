@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     let action_items = normalize_action_items(raw_nodes, &args.done_keywords, expand_until)?;
 
     macro_rules! handle_items {
-        ($ItemType:ty, $Variant:expr, $views:expr) => {
+        ($ItemType:ty, $Variant:expr, $views:expr) => {{
             action_items
                 .values()
                 // Parse and convert into the right kind of action item
@@ -49,11 +49,12 @@ fn main() -> Result<()> {
                 .try_fold(HashMap::new(), |mut map, item_res| {
                     let item = item_res?; // Fail fast
                     for (name, filter) in $views {
+                        // Get the entry in advance to make sure we create views that don't have
+                        // any data
+                        let entry = map.entry(name.to_string()).or_insert_with(Vec::new);
                         // If the item matches the filter, add it to the map under the view's name
                         if filter.matches(&item) {
-                            map.entry(name.to_string())
-                                .or_insert_with(Vec::new)
-                                .push(item.clone());
+                            entry.push(item.clone());
                         }
                     }
 
@@ -65,7 +66,7 @@ fn main() -> Result<()> {
                     items.sort_unstable_by_key(<$ItemType>::sort_key);
                     (view_name, $Variant(items))
                 })
-        };
+        }};
     }
 
     let mut views_data = HashMap::new();
