@@ -327,12 +327,15 @@ def cal_dashboard(items: list[dict], ty: Literal["events"] | Literal["daily_note
 
     # Display the data one day at a time (guaranteed to be in order because order is
     # maintained from insertion and Polaris returns them in order)
-    for idx, [date, day] in enumerate(dailies.items()):
+    for idx, [date, items] in enumerate(dailies.items()):
         yield Text.from_markup(f"[bold underline]{date.strftime('%A, %B %d')}[/bold underline]")
-        yield display_items(day, ty, current_date)
+        print(items)
+        yield display_items(items, ty, current_date)
 
         if idx != len(dailies):
             yield Text()
+    if not items:
+        yield display_items([], ty, current_date)
 
 def build_dashboards(json: dict, current_date: date):
     """
