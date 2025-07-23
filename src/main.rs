@@ -104,11 +104,14 @@ fn main() -> Result<()> {
     views_data.extend(handle_items!(Task, ViewData::Tasks, &views.tasks));
 
     // Now go through the target contexts and accumulate
-    for name in target_context_view_names {
+    for (interim_name, (name, _)) in target_context_view_names
+        .iter()
+        .zip(views.target_contexts.iter())
+    {
         // For each target contexts view, we inserted an extra view for the tasks that extracts
         // only those tasks with deadlines on or before the `until` date, so get those now. This is
         // guaranteed to exist, and of course to be a tasks filter.
-        let relevant_tasks = match views_data.remove(&name).unwrap() {
+        let relevant_tasks = match views_data.remove(interim_name).unwrap() {
             ViewData::Tasks(tasks) => tasks,
             _ => unreachable!(),
         };
@@ -134,7 +137,7 @@ fn main() -> Result<()> {
             }
         }
 
-        views_data.insert(name, ViewData::TargetContexts(target_contexts));
+        views_data.insert(name.to_string(), ViewData::TargetContexts(target_contexts));
     }
 
     // If the user requested goal views, run that extraction (unrelated to action items, and we
