@@ -49,6 +49,10 @@ pub enum View {
     /// multiple contexts, it will appear in each context's list).
     #[command(name = "target_contexts")]
     TargetContexts(TargetContextsFilter),
+    /// Produces a list of the goals for the given day, based on the goals source specified
+    /// internally (this part of the code is designed to be forked for your personal setup)
+    #[cfg(feature = "goals")]
+    Goals(GoalsFilter),
 }
 impl View {
     /// Validates the order of dates passed to this view. For instance, if this is a
@@ -111,6 +115,8 @@ impl View {
                 Ok(scheduled.or(*deadline))
             }
             Self::TargetContexts(TargetContextsFilter { until }) => Ok(Some(*until)),
+            #[cfg(feature = "goals")]
+            Self::Goals(GoalsFilter { date }) => Ok(Some(*date)),
         }
     }
 }
@@ -354,6 +360,13 @@ pub struct TargetContextsFilter {
     #[arg(short, long)]
     until: NaiveDate,
 }
+#[derive(Parser, Debug, Clone, Deserialize)]
+#[cfg(feature = "goals")]
+pub struct GoalsFilter {
+    /// The date for which goals should be extracted.
+    #[arg(short, long)]
+    pub date: NaiveDate,
+}
 
 /// Determines whether or not a date on an item meets an imposed cutoff (e.g. its deadline is
 /// before the cutoff).
@@ -413,6 +426,8 @@ pub struct AllViews {
     pub projects: Vec<(String, ProjectsFilter)>,
     pub tasks: Vec<(String, TasksFilter)>,
     pub target_contexts: Vec<(String, TargetContextsFilter)>,
+    #[cfg(feature = "goals")]
+    pub goals: Vec<(String, GoalsFilter)>,
 
     /// The latest date across all the views, if there is one (the user might have specified only
     /// non-date filters). This will be used to define when to stop expanding repeating timestamps

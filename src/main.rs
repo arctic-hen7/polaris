@@ -136,6 +136,15 @@ fn main() -> Result<()> {
         views_data.insert(name, ViewData::TargetContexts(target_contexts));
     }
 
+    // If the user requested goal views, run that extraction (unrelated to action items, and we
+    // shouldn't do any checking unless they request because it's a very personally-tuned system
+    // that most people will need to fork to get working)
+    #[cfg(feature = "goals")]
+    for (view_name, filter) in views.goals {
+        let goals = Goals::extract(filter.date, &args.starling_address)?;
+        views_data.insert(view_name, ViewData::Goals(goals));
+    }
+
     match args.encoding {
         Encoding::Bincode => {
             let bytes = bincode::serialize(&views_data)?;
@@ -164,4 +173,6 @@ enum ViewData {
     // Map of context that needs to be entered before the filter's `until` date to the tasks that
     // need to be done in that context
     TargetContexts(HashMap<String, Vec<Task>>),
+    #[cfg(feature = "goals")]
+    Goals(Goals),
 }

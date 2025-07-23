@@ -69,6 +69,8 @@ impl Cli {
             projects: Vec::new(),
             tasks: Vec::new(),
             target_contexts: Vec::new(),
+            #[cfg(feature = "goals")]
+            goals: Vec::new(),
 
             last_date: None,
         };
@@ -91,6 +93,8 @@ impl Cli {
                 View::TargetContexts(filter) => {
                     all_views.target_contexts.push((named_view.name, filter))
                 }
+                #[cfg(feature = "goals")]
+                View::Goals(filter) => all_views.goals.push((named_view.name, filter)),
             }
 
             // If we have a last date, update it

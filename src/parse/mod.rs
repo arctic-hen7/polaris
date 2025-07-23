@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 pub use action_item::*;
 pub use fetch::get_raw_action_items;
+pub use goals::Goals;
 pub use node::*;
 
 /// Normalises the given raw nodes to a list of parsed action items, repeated until the given date.
