@@ -378,7 +378,7 @@ def build_dashboards(json: dict, current_date: date):
 
         dashboards.append(PositionedDashboard(Panel(
             # Text.from_markup(f"[bold underline]{view_name}[/bold underline]", justify="center"),
-            displayed, title=view_name, expand=False
+            displayed, title=view_name
         ), view_name, view_pos))
         # TODO: What about when we *don't* have positions?
 
