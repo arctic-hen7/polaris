@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
+#[cfg(feature = "goals")]
+use crate::parse::Goals;
 use crate::{
     extractors::{DailyNote, Event, PersonDate, Project, Task, Tickle, Waiting},
-    parse::{Goals, Priority},
+    parse::Priority,
     ViewData,
 };
 use anyhow::{bail, Error};
@@ -22,6 +24,7 @@ pub enum View {
     Events(EventsFilter),
     /// Items with the `NOTE` keyword, which have a date associated with them. These are designed
     /// to record things to remember for a particular day.
+    #[command(name = "daily_notes")]
     DailyNotes(DailyNotesFilter),
     /// Items under a `tickles` parent tag with an associated date. These are intended to be
     /// reminders of things to re-examine on a specific date (typically items that go through the

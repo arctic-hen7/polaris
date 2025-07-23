@@ -1,5 +1,6 @@
 mod action_item;
 mod fetch;
+#[cfg(feature = "goals")]
 mod goals;
 mod node;
 mod repeat;
@@ -14,6 +15,7 @@ use uuid::Uuid;
 
 pub use action_item::*;
 pub use fetch::get_raw_action_items;
+#[cfg(feature = "goals")]
 pub use goals::Goals;
 pub use node::*;
 
