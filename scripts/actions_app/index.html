@@ -16,14 +16,14 @@
     <body>
         <main class="pb-16 p-1">
             <!-- Panel showing urgent contexts needing to be entered -->
-            <div id="panelContexts" class="">
+            <div id="panelContexts" class="hidden">
                 <h1 class="text-xl m-2 text-center">Urgent Contexts</h1>
 
                 <div id="urgentContexts"></div>
             </div>
 
             <!-- Panel showing all tasks for filtering -->
-            <div id="panelTasks" class="hidden">
+            <div id="panelTasks" class="">
                 <div class="flex flex-col items-center w-full">
                     <div class="m-2">
                         <span>Contexts:</span>
@@ -38,6 +38,9 @@
                         <select id="effort">
                             <option value="0">Minimal</option>
                             <option value="1" selected>Low</option>
+                            <option value="2" selected>Medium</option>
+                            <option value="3" selected>High</option>
+                            <option value="4" selected>Total</option>
                         </select>
                     </div>
                     <button id="filterButton" class="m-2 p-2 px-10 bg-sky-300/20 rounded-sm" onclick="doFilter(new Date())">Filter!</button>
@@ -48,8 +51,8 @@
         </main>
 
         <footer class="flex flex-row fixed bottom-0 w-full backdrop-blur-lg">
-            <button id="contextsButton" class="w-full p-2 cursor-pointer transition-colors bg-sky-300/10" onclick="setPanelContexts()">Contexts</button>
-            <button id="tasksButton" class="w-full p-2 cursor-pointer transition-colors" onclick="setPanelTasks()">Tasks</button>
+            <button id="contextsButton" class="w-full p-2 cursor-pointer transition-colors" onclick="setPanelContexts()">Contexts</button>
+            <button id="tasksButton" class="w-full p-2 cursor-pointer transition-colors bg-sky-300/10" onclick="setPanelTasks()">Tasks</button>
         </footer>
 
         <!-- This will be populated from `index.js` -->

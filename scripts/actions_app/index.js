@@ -291,7 +291,13 @@ const contextSelect = document.getElementById("contextsSelect");
 for (const ctx of CONTEXTS) {
     const option = document.createElement("option");
     option.value = ctx;
-    option.innerText = ctx.charAt(0).toUpperCase() + ctx.slice(1);
+    option.innerText = ctx
+        .split("_") // Split the string at underscores
+        .map((word) =>
+            word.charAt(0).toUpperCase() + // Capitalize first letter
+            word.slice(1) // Add the rest of the word in lowercase (if needed)
+        )
+        .join(" ");
     contextSelect.appendChild(option);
 }
 const peopleSelect = document.getElementById("peopleSelect");

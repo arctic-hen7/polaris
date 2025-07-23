@@ -74,7 +74,7 @@ def format_tasks_for_app(tasks):
 
 if __name__ == "__main__":
     data = json.load(sys.stdin)
-    app_data = format_tasks_for_app(data["easy_tasks"])
+    app_data = format_tasks_for_app(data)
     app_data_json = json.dumps(app_data)
 
     with open(f"{SELF_DIR}/actions_app/index.html", "r") as f:
