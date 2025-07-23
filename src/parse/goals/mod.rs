@@ -43,6 +43,15 @@ impl Goals {
         Ok(Self { date, goals })
     }
 }
+impl Default for Goals {
+    fn default() -> Self {
+        // Default to an empty goals list for today
+        Self {
+            date: NaiveDate::MIN,
+            goals: Vec::new(),
+        }
+    }
+}
 
 /// Different places goals can come from. This provides an abstraction over the final approach of
 /// extracting goals from a node with a known ID and allows for more "natural" strategies like

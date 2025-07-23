@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use crate::{
     extractors::{DailyNote, Event, PersonDate, Project, Task, Tickle, Waiting},
-    parse::Priority,
+    parse::{Goals, Priority},
+    ViewData,
 };
 use anyhow::{bail, Error};
 use chrono::{NaiveDate, NaiveDateTime};
@@ -433,4 +436,55 @@ pub struct AllViews {
     /// non-date filters). This will be used to define when to stop expanding repeating timestamps
     /// (after a buffer is added).
     pub last_date: Option<NaiveDate>,
+}
+impl AllViews {
+    pub fn dummies(&self) -> impl Iterator<Item = (&String, ViewData)> + '_ {
+        let iter = self
+            .events
+            .iter()
+            .map(|(name, _)| (name, ViewData::Events(Vec::new())))
+            .chain(
+                self.daily_notes
+                    .iter()
+                    .map(|(name, _)| (name, ViewData::DailyNotes(Vec::new()))),
+            )
+            .chain(
+                self.tickles
+                    .iter()
+                    .map(|(name, _)| (name, ViewData::Tickles(Vec::new()))),
+            )
+            .chain(
+                self.dates
+                    .iter()
+                    .map(|(name, _)| (name, ViewData::PersonDates(Vec::new()))),
+            )
+            .chain(
+                self.waits
+                    .iter()
+                    .map(|(name, _)| (name, ViewData::Waitings(Vec::new()))),
+            )
+            .chain(
+                self.projects
+                    .iter()
+                    .map(|(name, _)| (name, ViewData::Projects(Vec::new()))),
+            )
+            .chain(
+                self.tasks
+                    .iter()
+                    .map(|(name, _)| (name, ViewData::Tasks(Vec::new()))),
+            )
+            .chain(
+                self.target_contexts
+                    .iter()
+                    .map(|(name, _)| (name, ViewData::TargetContexts(HashMap::new()))),
+            );
+        #[cfg(feature = "goals")]
+        return iter.chain(
+            self.goals
+                .iter()
+                .map(|(name, _)| (name, ViewData::Goals(Goals::default()))),
+        );
+        #[cfg(not(feature = "goals"))]
+        return iter;
+    }
 }

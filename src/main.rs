@@ -49,12 +49,11 @@ fn main() -> Result<()> {
                 .try_fold(HashMap::new(), |mut map, item_res| {
                     let item = item_res?; // Fail fast
                     for (name, filter) in $views {
-                        // Get the entry in advance to make sure we create views that don't have
-                        // any data
-                        let entry = map.entry(name.to_string()).or_insert_with(Vec::new);
                         // If the item matches the filter, add it to the map under the view's name
                         if filter.matches(&item) {
-                            entry.push(item.clone());
+                            map.entry(name.to_string())
+                                .or_insert_with(Vec::new)
+                                .push(item.clone());
                         }
                     }
 
@@ -70,6 +69,9 @@ fn main() -> Result<()> {
     }
 
     let mut views_data = HashMap::new();
+    for (name, dummy) in views.dummies() {
+        views_data.insert(name.to_string(), dummy);
+    }
 
     // For each type of item, go through the action items and parse them (thereby validating),
     // and then map each item against the relevant filter type, creating an iterator of pairs
@@ -90,6 +92,11 @@ fn main() -> Result<()> {
     ));
     views_data.extend(handle_items!(Project, ViewData::Projects, &views.projects));
     views_data.extend(handle_items!(Waiting, ViewData::Waitings, &views.waits));
+    views_data.extend(handle_items!(
+        PersonDate,
+        ViewData::PersonDates,
+        &views.dates
+    ));
     // We inject extra filters for all the target context views so we can easily iterate over the
     // tasks relevant to them
     let mut target_context_view_names = Vec::with_capacity(views.target_contexts.len());
