@@ -364,7 +364,7 @@ def build_dashboards(json: dict, current_date: date):
                 context, tasks = context_data
                 context_minis.append((context, Group(
                     # Title for the context
-                    Text.from_markup(f"[bold]{context.replace('_', ' ').capitalize()}[/bold]", justify="center"),
+                    Text.from_markup(f"[bold]{context.replace('_', ' ').title()}[/bold]", justify="center"),
                     Text(),
                     display_items(tasks, "tasks", current_date),
                     Text() if i != len(view_data) - 1 else Group()
