@@ -1,11 +1,8 @@
-use std::collections::HashMap;
-
 #[cfg(feature = "goals")]
 use crate::parse::Goals;
 use crate::{
     extractors::{DailyNote, Event, PersonDate, Project, Task, Tickle, Waiting},
     parse::{Priority, SimpleTimestamp},
-    ViewData,
 };
 use anyhow::{bail, Error};
 use chrono::{NaiveDate, NaiveDateTime};
@@ -569,52 +566,21 @@ pub struct AllViews {
     pub last_date: Option<NaiveDate>,
 }
 impl AllViews {
-    pub fn dummies(&self) -> impl Iterator<Item = (&String, ViewData)> + '_ {
+    /// Returns all the view names in this aggregation.
+    pub fn names(&self) -> impl Iterator<Item = &String> + '_ {
         let iter = self
             .events
             .iter()
-            .map(|(name, _)| (name, ViewData::Events(Vec::new())))
-            .chain(
-                self.daily_notes
-                    .iter()
-                    .map(|(name, _)| (name, ViewData::DailyNotes(Vec::new()))),
-            )
-            .chain(
-                self.tickles
-                    .iter()
-                    .map(|(name, _)| (name, ViewData::Tickles(Vec::new()))),
-            )
-            .chain(
-                self.dates
-                    .iter()
-                    .map(|(name, _)| (name, ViewData::PersonDates(Vec::new()))),
-            )
-            .chain(
-                self.waits
-                    .iter()
-                    .map(|(name, _)| (name, ViewData::Waitings(Vec::new()))),
-            )
-            .chain(
-                self.projects
-                    .iter()
-                    .map(|(name, _)| (name, ViewData::Projects(Vec::new()))),
-            )
-            .chain(
-                self.tasks
-                    .iter()
-                    .map(|(name, _)| (name, ViewData::Tasks(Vec::new()))),
-            )
-            .chain(
-                self.target_contexts
-                    .iter()
-                    .map(|(name, _)| (name, ViewData::TargetContexts(HashMap::new()))),
-            );
+            .map(|(name, _)| name)
+            .chain(self.daily_notes.iter().map(|(name, _)| name))
+            .chain(self.tickles.iter().map(|(name, _)| name))
+            .chain(self.dates.iter().map(|(name, _)| name))
+            .chain(self.waits.iter().map(|(name, _)| name))
+            .chain(self.projects.iter().map(|(name, _)| name))
+            .chain(self.tasks.iter().map(|(name, _)| name))
+            .chain(self.target_contexts.iter().map(|(name, _)| name));
         #[cfg(feature = "goals")]
-        return iter.chain(
-            self.goals
-                .iter()
-                .map(|(name, _)| (name, ViewData::Goals(Goals::default()))),
-        );
+        return iter.chain(self.goals.iter().map(|(name, _)| name));
         #[cfg(not(feature = "goals"))]
         return iter;
     }

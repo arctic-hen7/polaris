@@ -1,6 +1,7 @@
 use crate::views::{AllViews, View};
 use anyhow::{bail, Context, Error};
 use clap::{Parser, ValueEnum};
+use serde::Deserialize;
 use std::{collections::HashMap, ops::Deref, path::PathBuf, str::FromStr};
 
 /// Polaris, the ultimate scheduling tool.
@@ -47,11 +48,20 @@ impl Cli {
         } else if let Some(json_path) = &self.view_options.views_json {
             let json_contents = std::fs::read_to_string(json_path)
                 .with_context(|| "failed to read json views file")?;
-            let views: HashMap<String, View> = serde_json::from_str(&json_contents)
+            let views: HashMap<String, JsonView> = serde_json::from_str(&json_contents)
                 .with_context(|| "failed to parse json views file")?;
             let views_vec = views
                 .into_iter()
-                .map(|(name, view)| NamedView { name, view })
+                .flat_map(|(name, view)| {
+                    let vec = match view {
+                        JsonView::Single(view) => vec![view],
+                        JsonView::Multiple(v) => v,
+                    };
+                    vec.into_iter().map(move |view| NamedView {
+                        name: name.clone(),
+                        view,
+                    })
+                })
                 .collect();
             Ok(views_vec)
         } else {
@@ -142,6 +152,27 @@ pub enum Encoding {
     Json,
     /// Bincode, which is *much* faster to handle if passing output to another Rust program.
     Bincode,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum JsonView {
+    Single(View),
+    Multiple(Vec<View>),
+}
+
+#[derive(Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+enum ViewType {
+    Events,
+    DailyNotes,
+    Tickles,
+    Dates,
+    Waits,
+    Projects,
+    Tasks,
+    TargetContexts,
+    Goals,
 }
 
 /// A wrapper type over the duration buffer which will be added after the last date we detect
