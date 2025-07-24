@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-# Loads Polaris data from stdin and converts it to an HTML dashboard of actions, which
-# allows the user to see contexts which need urgent focus, as well as filter tasks by
-# relevant parameters. This will only operate on easy tasks, which are designed to be
-# completed dynamically, rather than being scheduled for a particular day.
+# Loads Polaris data from stdin (as an array) and converts it to an HTML dashboard of
+# actions, which allows the user to see contexts which need urgent focus, as well as
+# filter tasks by relevant parameters. This will only operate on easy tasks, which are
+# designed to be completed dynamically, rather than being scheduled for a particular day.
 
 import os
 import json
