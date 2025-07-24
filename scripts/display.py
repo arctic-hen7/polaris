@@ -374,7 +374,7 @@ def build_dashboards(json: dict, current_date: date):
                     # Title for the context
                     Text.from_markup(f"[bold]{context.replace('_', ' ').title()}[/bold]", justify="center"),
                     Text(),
-                    display_items({"tasks": tasks}, "tasks", current_date),
+                    display_items({"tasks": tasks}, current_date),
                     Text() if i != len(tc_data) - 1 else Group()
                 )))
 
