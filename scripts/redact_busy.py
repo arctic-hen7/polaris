@@ -16,11 +16,6 @@ def redact_events(items):
 
     redacted = []
     for item in items:
-        # Remove all non-event items
-        if item["ty"] != "event":
-            items.remove(item)
-            continue
-
         # Redact the title and description
         item["title"] = "🔒 BUSY"
         item["body"] = "The details of this event have been redacted for privacy."

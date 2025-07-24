@@ -128,4 +128,4 @@ def upload_to_gcal(events, email="env:GOOGLE_EMAIL", calendar="primary", service
 
 if __name__ == "__main__":
     data = json.load(sys.stdin)
-    upload_to_gcal(data["events"])
+    upload_to_gcal(data)
