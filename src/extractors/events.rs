@@ -22,8 +22,6 @@ pub struct Event {
     ///
     /// TODO: Validate how range timestamps are brought over multiple days here
     pub timestamp: SimpleTimestamp,
-    /// The type of the event.
-    pub ty: EventType,
 }
 impl Event {
     /// Converts the given action item into events, if its repeats would go on the calendar.
@@ -35,53 +33,31 @@ impl Event {
             // No person-related dates, tickles, daily notes, or waiting items are events. This
             // check is the same every time, so should get hoisted out of the loop
             let parent_tags = &item.base().parent_tags;
-            if parent_tags.contains("person_dates")
-                || parent_tags.contains("tickles")
-                || matches!(item, ActionItem::Waiting { .. } | ActionItem::Note { .. })
-            {
+            if parent_tags.contains("person_dates") || parent_tags.contains("tickles") {
+                // No person-related dates or tickles are events
                 None
-            } else {
+            } else if let ActionItem::None {
+                base,
+                properties,
+                people,
+            } = item
+            {
                 repeat.primary.as_ref().map(|ts| {
                     Ok(Self {
-                        id: item.base().id,
-                        title: item.base().title.last().cloned().unwrap(),
-                        body: item.base().body.clone(),
-                        location: if let ActionItem::None { properties, .. } = item {
-                            properties.get("LOCATION").cloned()
-                        } else {
-                            None
-                        },
-                        people: match item {
-                            ActionItem::Task { people, .. } | ActionItem::None { people, .. } => {
-                                people.clone()
-                            }
-                            _ => Vec::new(),
-                        },
+                        id: base.id,
+                        title: base.title.last().cloned().unwrap(),
+                        body: base.body.clone(),
+                        location: properties.get("LOCATION").cloned(),
+                        people: people.clone(),
                         timestamp: ts.clone(),
-                        ty: match item {
-                            ActionItem::Task { .. } => EventType::Task,
-                            ActionItem::Project { .. } => EventType::Project,
-                            ActionItem::None { .. } => EventType::Event,
-
-                            ActionItem::Waiting { .. } | ActionItem::Note { .. } => unreachable!(),
-                        },
                     })
                 })
+            } else {
+                // No daily notes, waiting items, tasks, or projects are events
+                // NOTE: Used to be that we would catch tasks and projects with timestamps, they're
+                // now handled in their own pipelines.
+                None
             }
         })
     }
-}
-
-/// The type of an event.
-#[derive(Serialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum EventType {
-    /// A task that's been scheduled for a specific time.
-    Task,
-    /// A project that's been scheduled for a specific time.
-    Project,
-    /// An artificial item placed on the calendar for convenience (e.g. daily notes.)
-    Composite,
-    /// An event proper.
-    Event,
 }

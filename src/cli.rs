@@ -136,7 +136,7 @@ struct ViewOptions {
 
 /// The encoding to use for the output of the CLI.
 #[derive(ValueEnum, Clone, Debug)]
-#[clap(rename_all = "lowercase")]
+#[clap(rename_all = "snake_case")]
 pub enum Encoding {
     /// JSON, the default encoding.
     Json,

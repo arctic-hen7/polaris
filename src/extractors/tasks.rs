@@ -21,6 +21,12 @@ pub struct Task {
     pub body: Option<String>,
     /// Whether or not this task is actionable, and can be started immediately.
     pub can_start: bool,
+    /// A timestamp stating when exactly this task should be done, if it has one.
+    pub timestamp: Option<SimpleTimestamp>,
+    /// The timestamp on the parent project, if it has one. This is returned separately for maximum
+    /// flexibility with how the caller wants to handle situations involving both a task and a
+    /// project timestamp.
+    pub parent_timestamp: Option<SimpleTimestamp>,
     /// The date by which this task should be started. If an earlier date is present on the parent
     /// project, that will be used. This is required to be before whatever the computed deadline
     /// is, or an error will be thrown.
@@ -90,25 +96,24 @@ impl Task {
                         );
                     }
 
-                    // And finally only return the task if it and its parent project have not been
-                    // scheduled for a particular time
-                    if repeat.primary.is_some() || parent_ts.is_some() {
-                        Ok(None)
-                    } else {
-                        Ok(Some(Self {
-                            id: base.id,
-                            title: base.title.last().cloned().unwrap(),
-                            body: base.body.clone(),
-                            can_start: *can_start,
-                            scheduled,
-                            deadline,
-                            priority: computed_priority.unwrap_or(*priority),
-                            project_has_non_actionable: has_next_tasks,
-                            effort: *effort,
-                            contexts: contexts.clone(),
-                            people: people.clone(),
-                        }))
-                    }
+                    // NOTE: We used to block if either the primary on the task or its project
+                    // existed because those would go through the events pipeline, now we return
+                    // them actively and allow filtering for them.
+                    Ok(Some(Self {
+                        id: base.id,
+                        title: base.title.last().cloned().unwrap(),
+                        body: base.body.clone(),
+                        can_start: *can_start,
+                        timestamp: repeat.primary.clone(),
+                        parent_timestamp: parent_ts.clone(),
+                        scheduled,
+                        deadline,
+                        priority: computed_priority.unwrap_or(*priority),
+                        project_has_non_actionable: has_next_tasks,
+                        effort: *effort,
+                        contexts: contexts.clone(),
+                        people: people.clone(),
+                    }))
                 } else {
                     Ok(None)
                 }

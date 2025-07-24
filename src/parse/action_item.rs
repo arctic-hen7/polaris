@@ -269,25 +269,28 @@ impl Effort {
         }
     }
 
-    /// Converts the given string into an effort, if possible.
-    pub fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "total" => Ok(Self::Total),
-            "high" => Ok(Self::High),
-            "medium" => Ok(Self::Medium),
-            "med" => Ok(Self::Medium),
-            "low" => Ok(Self::Low),
-            "minimal" => Ok(Self::Minimal),
-            "min" => Ok(Self::Minimal),
-            e => bail!("unknown effort '{e}'"),
-        }
-    }
+    // NOTE: This was used for the CLI effort filters, might add them back in future, so keeping
+    // for now.
+    //
+    // /// Converts the given string into an effort, if possible.
+    // pub fn from_str(s: &str) -> Result<Self> {
+    //     match s.to_lowercase().as_str() {
+    //         "total" => Ok(Self::Total),
+    //         "high" => Ok(Self::High),
+    //         "medium" => Ok(Self::Medium),
+    //         "med" => Ok(Self::Medium),
+    //         "low" => Ok(Self::Low),
+    //         "minimal" => Ok(Self::Minimal),
+    //         "min" => Ok(Self::Minimal),
+    //         e => bail!("unknown effort '{e}'"),
+    //     }
+    // }
 }
 
 /// The priority of a task or project.
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, ValueEnum, Debug)]
 #[serde(rename_all = "snake_case")]
-#[clap(rename_all = "lowercase")]
+#[clap(rename_all = "snake_case")]
 pub enum Priority {
     // NOTE: These values are *not* the same as what you'll see in priority tags!! They're used
     // only to tell the compiler how to order the variants.
@@ -297,16 +300,6 @@ pub enum Priority {
     Low = 0,
 }
 impl Priority {
-    /// Converts the given string into a priority, if possible.
-    pub fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "important" | "impt" => Ok(Self::Important),
-            "high" => Ok(Self::High),
-            "medium" | "med" => Ok(Self::Medium),
-            "low" => Ok(Self::Low),
-            p => bail!("unknown priority '{p}'"),
-        }
-    }
     /// Parses a priority from the given node.
     fn from_node(node: &Node) -> Result<Self> {
         match node.metadata.as_ref().unwrap().priority.as_deref() {

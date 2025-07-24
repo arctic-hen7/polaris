@@ -82,8 +82,16 @@ impl Waiting {
 }
 
 impl Project {
-    pub fn sort_key(&self) -> (ScheduledDeadline, Priority, String) {
+    pub fn sort_key(&self) -> (NaiveDate, NaiveTime, ScheduledDeadline, Priority, String) {
         (
+            self.timestamp
+                .as_ref()
+                .map(|ts| ts.start.date)
+                .unwrap_or(END_OF_TIME.date()),
+            self.timestamp
+                .as_ref()
+                .and_then(|ts| ts.start.time)
+                .unwrap_or(NaiveTime::from_hms_opt(23, 59, 59).unwrap()),
             ScheduledDeadline::new(self.scheduled, self.deadline),
             self.priority,
             self.title.clone(),
@@ -92,8 +100,34 @@ impl Project {
 }
 
 impl Task {
-    pub fn sort_key(&self) -> (ScheduledDeadline, Priority, String) {
+    pub fn sort_key(
+        &self,
+    ) -> (
+        NaiveDate,
+        NaiveTime,
+        NaiveDate,
+        NaiveTime,
+        ScheduledDeadline,
+        Priority,
+        String,
+    ) {
         (
+            self.timestamp
+                .as_ref()
+                .map(|ts| ts.start.date)
+                .unwrap_or(END_OF_TIME.date()),
+            self.timestamp
+                .as_ref()
+                .and_then(|ts| ts.start.time)
+                .unwrap_or(NaiveTime::from_hms_opt(23, 59, 59).unwrap()),
+            self.parent_timestamp
+                .as_ref()
+                .map(|ts| ts.start.date)
+                .unwrap_or(END_OF_TIME.date()),
+            self.parent_timestamp
+                .as_ref()
+                .and_then(|ts| ts.start.time)
+                .unwrap_or(NaiveTime::from_hms_opt(23, 59, 59).unwrap()),
             ScheduledDeadline::new(self.scheduled, self.deadline),
             self.priority,
             self.title.clone(),

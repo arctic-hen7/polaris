@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::parse::Goals;
 use crate::{
     extractors::{DailyNote, Event, PersonDate, Project, Task, Tickle, Waiting},
-    parse::Priority,
+    parse::{Priority, SimpleTimestamp},
     ViewData,
 };
 use anyhow::{bail, Error};
@@ -17,14 +17,13 @@ use serde::Deserialize;
 #[derive(Deserialize, Subcommand, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
-#[command(rename_all = "lowercase")]
+#[command(rename_all = "snake_case")]
 pub enum View {
     /// Items with specific timestamps, usually calendar events or tasks scheduled for a specific
     /// date (and potentially time).
     Events(EventsFilter),
     /// Items with the `NOTE` keyword, which have a date associated with them. These are designed
     /// to record things to remember for a particular day.
-    #[command(name = "daily_notes")]
     DailyNotes(DailyNotesFilter),
     /// Items under a `tickles` parent tag with an associated date. These are intended to be
     /// reminders of things to re-examine on a specific date (typically items that go through the
@@ -53,7 +52,6 @@ pub enum View {
     /// completed. Formally, this will go through all tasks with deadlines on or before the given
     /// date, and will produce the list of these tasks, organised by context (if a task has
     /// multiple contexts, it will appear in each context's list).
-    #[command(name = "target_contexts")]
     TargetContexts(TargetContextsFilter),
     /// Produces a list of the goals for the given day, based on the goals source specified
     /// internally (this part of the code is designed to be forked for your personal setup)
@@ -72,13 +70,13 @@ impl View {
     pub fn validate(&self) -> Result<Option<NaiveDate>, Error> {
         match &self {
             Self::Events(EventsFilter { from, until }) => {
-                if from.is_some_and(|f| *until < f) {
+                if from.is_some_and(|f| *until <= f) {
                     bail!("`until` date must be after `from` date");
                 }
                 Ok(Some(*until))
             }
             Self::DailyNotes(DailyNotesFilter { from, until }) => {
-                if from.is_some_and(|f| *until < f) {
+                if from.is_some_and(|f| *until <= f) {
                     bail!("`until` date must be after `from` date");
                 }
                 Ok(Some(*until))
@@ -90,24 +88,37 @@ impl View {
                 deadline,
                 planning_match: _,
             }) => {
-                if deadline.is_some_and(|d| scheduled.is_some_and(|s| d < s)) {
+                if deadline.is_some_and(|d| scheduled.is_some_and(|s| d <= s)) {
                     bail!("`deadline` date must be after `scheduled` date");
                 }
                 Ok(scheduled.or(*deadline))
             }
             Self::Projects(ProjectsFilter {
+                from,
+                until,
                 scheduled,
                 deadline,
                 planning_match: _,
+                timestamp_match: _,
             }) => {
-                if deadline.is_some_and(|d| scheduled.is_some_and(|s| d < s)) {
+                if deadline.is_some_and(|d| scheduled.is_some_and(|s| d <= s)) {
                     bail!("`deadline` date must be after `scheduled` date");
                 }
-                Ok(scheduled.or(*deadline))
+                if from.is_some_and(|f| until.is_some_and(|u| u >= f)) {
+                    bail!("`until` date must be after `from` date");
+                }
+                let sd = scheduled.or(*deadline);
+                let fu = until.or(*from);
+
+                Ok(sd.max(fu))
             }
             Self::Tasks(TasksFilter {
+                from,
+                until,
                 scheduled,
                 deadline,
+                timestamp_match: _,
+                parent_timestamp_match: _,
                 planning_match: _,
                 next_tasks: _,
                 contexts: _,
@@ -118,9 +129,19 @@ impl View {
                 if deadline.is_some_and(|d| scheduled.is_some_and(|s| d < s)) {
                     bail!("`deadline` date must be after `scheduled` date");
                 }
-                Ok(scheduled.or(*deadline))
+                if from.is_some_and(|f| until.is_some_and(|u| u >= f)) {
+                    bail!("`until` date must be after `from` date");
+                }
+                let sd = scheduled.or(*deadline);
+                let fu = until.or(*from);
+
+                Ok(sd.max(fu))
             }
-            Self::TargetContexts(TargetContextsFilter { until }) => Ok(Some(*until)),
+            Self::TargetContexts(TargetContextsFilter {
+                until,
+                include_with_timestamps: _,
+                include_with_parent_timestamps: _,
+            }) => Ok(Some(*until)),
             #[cfg(feature = "goals")]
             Self::Goals(GoalsFilter { date }) => Ok(Some(*date)),
         }
@@ -235,6 +256,16 @@ impl WaitsFilter {
 }
 #[derive(Parser, Debug, Clone, Deserialize)]
 pub struct ProjectsFilter {
+    /// The date from which to show projects with timestamps.
+    #[arg(short, long)]
+    from: Option<NaiveDate>,
+    /// The date at which to stop showing projects with timestamps (inclusive).
+    #[arg(short, long)]
+    until: Option<NaiveDate>,
+    /// How we should match on the project's timestamp.
+    #[arg(short, long, alias = "ts_match", default_value = "all")]
+    #[serde(default)]
+    timestamp_match: TimestampMatch,
     /// A scheduled date on an item indicates when it should first be surfaced to the user, and
     /// this will show all items that should be surfaced on or before this date. If not
     /// present, items won't be filtered by their scheduled date.
@@ -266,10 +297,27 @@ impl ProjectsFilter {
         ) && (self.planning_match != PlanningMatchType::ScheduledOrDeadline
             || p.scheduled.is_some()
             || p.deadline.is_some())
+            && timestamp_matches(&p.timestamp, self.from, self.until, self.timestamp_match)
     }
 }
 #[derive(Parser, Debug, Clone, Deserialize)]
 pub struct TasksFilter {
+    /// The date from which to show tasks with timestamps. This will apply to both the task's own
+    /// timestamp, and to its parent's, if present (i.e. both must match).
+    #[arg(short, long)]
+    from: Option<NaiveDate>,
+    /// The date at which to stop showing tasks with timestamps (inclusive). This will apply to
+    /// both the task's own timestamp, and to its parent's, if present (i.e. both must match).
+    #[arg(short, long)]
+    until: Option<NaiveDate>,
+    /// How we should match on the task's own timestamp.
+    #[arg(long, alias = "ts_match", default_value = "all")]
+    #[serde(default)]
+    timestamp_match: TimestampMatch,
+    /// How we should match on the parent's timestamp.
+    #[arg(long, alias = "parent_ts_match", default_value = "all")]
+    #[serde(default)]
+    parent_timestamp_match: TimestampMatch,
     /// A scheduled date on an item indicates when it should first be surfaced to the user, and
     /// this will show all items that should be surfaced on or before this date. If not
     /// present, items won't be filtered by their scheduled date.
@@ -284,7 +332,7 @@ pub struct TasksFilter {
     /// filters for these, this should be [`PlanningMatchType::All`], otherwise you'll filter
     /// to only items that have a scheduled/deadline date, without filtering on that date
     /// itself (which may be desired, but usually isn't).
-    #[arg(short = 'm', long = "match", default_value = "all")]
+    #[arg(short = 'm', long = "planning_match", default_value = "all")]
     #[serde(default)]
     planning_match: PlanningMatchType,
     /// Whether or not to show non-actionable tasks with the `NEXT` keyword.
@@ -341,13 +389,33 @@ impl TasksFilter {
         // Filtering by people is the same as filtering by contexts
         (self.people.is_none() || (self.people.as_ref().is_some_and(|p| p.is_empty()) && t.people.is_empty()) || (t.people.iter().all(|(_id, p)| {
             self.people.as_ref().unwrap().contains(p)
-        }) && !t.people.is_empty()))
+        }) && !t.people.is_empty())) &&
+        // Make sure both the task's own timestamp and the parent timestamp match
+        timestamp_matches(&t.timestamp, self.from, self.until, self.timestamp_match) &&
+        timestamp_matches(
+            &t.parent_timestamp,
+            self.from,
+            self.until,
+            self.parent_timestamp_match,
+        )
     }
 
     /// Creates a new filter for tasks that are relevant to determining the target contexts that
     /// meet the given [`TargetContextsFilter`].
     pub fn for_target_contexts(filter: &TargetContextsFilter) -> Self {
         Self {
+            from: None,
+            until: None,
+            timestamp_match: if filter.include_with_timestamps {
+                TimestampMatch::All
+            } else {
+                TimestampMatch::OnlyWithout
+            },
+            parent_timestamp_match: if filter.include_with_parent_timestamps {
+                TimestampMatch::All
+            } else {
+                TimestampMatch::OnlyWithout
+            },
             scheduled: None,
             deadline: Some(filter.until),
             planning_match: PlanningMatchType::DeadlineOnly,
@@ -365,6 +433,13 @@ pub struct TargetContextsFilter {
     /// their deadlines, and the contexts for those tasks will be produced.
     #[arg(short, long)]
     until: NaiveDate,
+    /// Whether or not to include tasks with *their own* primary timestamps.
+    #[arg(long)]
+    include_with_timestamps: bool,
+    /// Whether or not to include tasks with *parent* primary timestamps (i.e. whose projects have
+    /// been slated for a particular time).
+    #[arg(long)]
+    include_with_parent_timestamps: bool,
 }
 #[derive(Parser, Debug, Clone, Deserialize)]
 #[cfg(feature = "goals")]
@@ -393,31 +468,84 @@ fn meets_dt(
         })
 }
 
+/// Determines whether or not the given timestamp matches the given filters.
+///
+/// If there is no timestamp, this will pass unless `match_type` is set to
+/// [`TimestampMatch::OnlyWith`]. If the timestamp is present and `match_type` is
+/// [`TimestampMatch::OnlyWithout`], then this will fail. Otherwise, we'll check that the timestamp
+/// is between the given `from` and `until` dates, if they're present.
+fn timestamp_matches(
+    item_timestamp: &Option<SimpleTimestamp>,
+    imposed_from: Option<NaiveDate>,
+    imposed_until: Option<NaiveDate>,
+    match_type: TimestampMatch,
+) -> bool {
+    match (match_type, item_timestamp) {
+        // If we don't care about timestamps, or we need one and we have it, then apply the actual
+        // filters
+        (TimestampMatch::All, Some(ts)) | (TimestampMatch::OnlyWith, Some(ts)) => {
+            // Either we don't have a `from` date, or we're on or after it
+            imposed_from.is_none_or(|from| ts.start.date >= from) &&
+            // Either we don't have an `until` date, or we're on or before it (using the start date
+            // as a backup if we don't have an end date; same behaviour as for events)
+            imposed_until
+                    .is_none_or(|until| ts.end.as_ref().unwrap_or(&ts.start).date <= until)
+        }
+        // If we need a timestamp and don't get one, or if we need to *not* have one but we do,
+        // fail immediately
+        (TimestampMatch::OnlyWith, None) | (TimestampMatch::OnlyWithout, Some(_)) => false,
+        (TimestampMatch::All, None) | (TimestampMatch::OnlyWithout, None) => true,
+    }
+}
+
 /// The type of matching to be performed when filtering by scheduled/deadline dates.
 #[derive(Deserialize, ValueEnum, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum PlanningMatchType {
     /// Show all items not excluded by the scheduled/deadline criteria. This will show items that
     /// have no scheduled/deadline dates as well as those that do.
-    #[clap(name = "all", alias = "any")]
+    #[clap(alias = "any")]
     All,
     /// Show only items that have a scheduled date that matches the given criterion. Items which
     /// would match because they have no scheduled date will not be shown.
-    #[clap(name = "scheduled_only", alias = "force_scheduled")]
+    #[clap(alias = "force_scheduled")]
     ScheduledOnly,
     /// Show only items that have a deadline date that matches the given criterion. Items which
     /// would match because they have no deadline will not be shown.
-    #[clap(name = "deadline_only", alias = "force_deadline")]
+    #[clap(alias = "force_deadline")]
     DeadlineOnly,
     /// Show only items that have either a scheduled date or a deadline date that matches the given
     /// criterion. Items which would match because they have neither a scheduled date nor a
     /// deadline will not be shown, though those that have only one will be.
-    #[clap(name = "scheduled_or_deadline", alias = "either")]
+    #[clap(alias = "either")]
     ScheduledOrDeadline,
 }
 impl Default for PlanningMatchType {
     fn default() -> Self {
         PlanningMatchType::All
+    }
+}
+
+/// The type of matching to be performed on objects with timestamps.
+#[derive(Deserialize, ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[clap(rename_all = "snake_case")]
+enum TimestampMatch {
+    /// Show items with or without timestamps. Any filters over timestamps will be applied to those
+    /// that have them, and not to those that don't.
+    #[clap(alias = "any")]
+    All,
+    /// Show only items with timestamps, applying any other timestamp-related filters to them.
+    #[clap(alias = "require")]
+    OnlyWith,
+    /// Show only items without timestamps. Other timestamp-related filters of course will not be
+    /// applied to them.
+    #[clap(alias = "none")]
+    OnlyWithout,
+}
+impl Default for TimestampMatch {
+    fn default() -> Self {
+        Self::All
     }
 }
 

@@ -8,7 +8,7 @@ mod tickles;
 mod waiting;
 
 pub use daily_notes::DailyNote;
-pub use events::{Event, EventType};
+pub use events::Event;
 pub use people_dates::PersonDate;
 pub use projects::Project;
 pub use tasks::Task;

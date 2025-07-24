@@ -1,4 +1,4 @@
-use crate::{ActionItem, Priority};
+use crate::{parse::SimpleTimestamp, ActionItem, Priority};
 use anyhow::{bail, Result};
 use chrono::NaiveDateTime;
 use serde::Serialize;
@@ -20,6 +20,8 @@ pub struct Project {
     pub title: String,
     /// The body of the project, if there is one.
     pub body: Option<String>,
+    /// The main timestamp of the project, indicating when to next work on it, if it has one.
+    pub timestamp: Option<SimpleTimestamp>,
     /// When the user should start working on this project.
     pub scheduled: Option<NaiveDateTime>,
     /// When the user must complete this project by.
@@ -61,6 +63,7 @@ impl Project {
                         id: base.id,
                         title: base.title.last().cloned().unwrap(),
                         body: base.body.clone(),
+                        timestamp: repeat.primary.clone(),
                         scheduled: repeat.scheduled,
                         deadline: repeat.deadline,
                         priority: computed_priority.unwrap_or(*priority),
