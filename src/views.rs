@@ -65,13 +65,13 @@ impl View {
     pub fn validate(&self) -> Result<Option<NaiveDate>, Error> {
         match &self {
             Self::Events(EventsFilter { from, until }) => {
-                if from.is_some_and(|f| *until <= f) {
+                if from.is_some_and(|f| *until < f) {
                     bail!("`until` date must be after `from` date");
                 }
                 Ok(Some(*until))
             }
             Self::DailyNotes(DailyNotesFilter { from, until }) => {
-                if from.is_some_and(|f| *until <= f) {
+                if from.is_some_and(|f| *until < f) {
                     bail!("`until` date must be after `from` date");
                 }
                 Ok(Some(*until))
@@ -83,7 +83,7 @@ impl View {
                 deadline,
                 planning_match: _,
             }) => {
-                if deadline.is_some_and(|d| scheduled.is_some_and(|s| d <= s)) {
+                if deadline.is_some_and(|d| scheduled.is_some_and(|s| d < s)) {
                     bail!("`deadline` date must be after `scheduled` date");
                 }
                 Ok(scheduled.or(*deadline))
@@ -96,10 +96,10 @@ impl View {
                 planning_match: _,
                 timestamp_match: _,
             }) => {
-                if deadline.is_some_and(|d| scheduled.is_some_and(|s| d <= s)) {
+                if deadline.is_some_and(|d| scheduled.is_some_and(|s| d < s)) {
                     bail!("`deadline` date must be after `scheduled` date");
                 }
-                if from.is_some_and(|f| until.is_some_and(|u| u >= f)) {
+                if from.is_some_and(|f| until.is_some_and(|u| u < f)) {
                     bail!("`until` date must be after `from` date");
                 }
                 let sd = scheduled.or(*deadline);
@@ -124,7 +124,7 @@ impl View {
                 if deadline.is_some_and(|d| scheduled.is_some_and(|s| d < s)) {
                     bail!("`deadline` date must be after `scheduled` date");
                 }
-                if from.is_some_and(|f| until.is_some_and(|u| u >= f)) {
+                if from.is_some_and(|f| until.is_some_and(|u| u < f)) {
                     bail!("`until` date must be after `from` date");
                 }
                 let sd = scheduled.or(*deadline);
