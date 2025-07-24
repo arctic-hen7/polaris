@@ -265,7 +265,8 @@ impl Effort {
             Some("minimal") => Ok(Self::Minimal),
             Some("min") => Ok(Self::Minimal),
             Some(e) => bail!("unknown effort '{e}' on node {}", node.id),
-            None => bail!("no effort level specified for node {}", node.id),
+            None => Ok(Self::Medium),
+            // None => bail!("no effort level specified for node {}", node.id),
         }
     }
 
