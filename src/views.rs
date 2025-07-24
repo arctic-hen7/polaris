@@ -429,11 +429,13 @@ pub struct TargetContextsFilter {
     #[arg(short, long)]
     until: NaiveDate,
     /// Whether or not to include tasks with *their own* primary timestamps.
-    #[arg(long)]
+    #[arg(long, default_value = "false")]
+    #[serde(default)]
     include_with_timestamps: bool,
     /// Whether or not to include tasks with *parent* primary timestamps (i.e. whose projects have
     /// been slated for a particular time).
-    #[arg(long)]
+    #[arg(long, default_value = "false")]
+    #[serde(default)]
     include_with_parent_timestamps: bool,
 }
 #[derive(Parser, Debug, Clone, Deserialize)]

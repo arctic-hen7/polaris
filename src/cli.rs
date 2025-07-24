@@ -161,20 +161,6 @@ enum JsonView {
     Multiple(Vec<View>),
 }
 
-#[derive(Deserialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "snake_case")]
-enum ViewType {
-    Events,
-    DailyNotes,
-    Tickles,
-    Dates,
-    Waits,
-    Projects,
-    Tasks,
-    TargetContexts,
-    Goals,
-}
-
 /// A wrapper type over the duration buffer which will be added after the last date we detect
 /// across all the views the user specifies. This allows accounting for things like long
 /// notification times on person-related dates, which will only be detected if we expand timestamps
