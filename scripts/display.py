@@ -124,20 +124,63 @@ class DisplayItem:
             yield Text("")
 
 @group()
-def display_items(items, ty, current_date: date):
+def display_items(map, current_date: date):
     """
     Returns a Rich display of the given action items, with timestamps formatted relative to the
-    given date.
+    given date. This expects an object of items, potentially containing multiple types, and within
+    each type, the items will be ordered by timestamp/date if present, and otherwise displayed
+    in the order given (i.e. as ordered by Polaris).
     """
 
-    for idx, item in enumerate(items):
-        display_item = transform_item(item, ty)
-        if not display_item: continue
+    multiple_types = len(map) > 1
+    type_padding = 2 if multiple_types else 0
+    for type_idx, [ty, ty_data] in enumerate(sorted(map.items(), key=lambda x: x[0])):
+        # If we have multiple types, display the type name
+        if multiple_types:
+            yield Padding(Text.from_markup(f"[bold underline]{ty.replace('_', ' ').title()}[/bold underline]"), (0, 0, 0, 0))
 
-        yield display_item.display(current_date, idx == len(items) - 1)
+        # For each type, accumulate into date-based sections if needed (these will be automatically
+        # in order, Polaris orders everything with dates properly)
+        sections = {}
+        only_undated = True
+        for item in ty_data:
+            # Use the start date of `timestamp` if we have it, fall back to `date` for daily notes in particular
+            date = item["timestamp"]["start"]["date"] if item.get("timestamp") else item.get("date")
+            if date:
+                only_undated = False
+                # If the item has a timestamp, use that to group it
+                date_parsed = datetime.strptime(date, "%Y-%m-%d").date()
+                sections.setdefault(date_parsed, []).append(item)
+            else:
+                # Everything without a timestamp goes in an undated section
+                sections.setdefault("Undated", []).append(item)
 
-    if not items:
-        yield Text.from_markup("[red italic]No items found.[/red italic]")
+        section_padding = (0 if only_undated else 2) + type_padding
+        for section_idx, [section_date, items] in enumerate(sections.items()):
+            # Make clear which section this is, unless there's only the undated section
+            if section_date == "Undated" and not only_undated:
+                yield Padding(Text.from_markup("[bold underline]Undated items[/bold underline]"), (0, 0, 0, type_padding))
+            elif section_date != "Undated":
+                # If we have a date, format it nicely
+                formatted_date = section_date.strftime("%A, %B %d")
+                yield Padding(Text.from_markup(f"[bold underline]{formatted_date}[/bold underline]"), (0, 0, 0, type_padding))
+
+            if not items:
+                yield Padding(Text.from_markup("[red italic]No items found.[/red italic]"), (0, 0, 0, section_padding))
+            else:
+                for idx, item in enumerate(items):
+                    display_item = transform_item(item, ty)
+                    if not display_item: continue
+
+                    yield Padding(display_item.display(current_date, idx == len(items) - 1), (0, 0, 0, section_padding))
+
+            if section_idx != len(sections) - 1:
+                # If this is not the last section, add a spacer
+                yield Text()
+
+        if type_idx != len(map) - 1:
+            # If this is not the last type, add a spacer
+            yield Text()
 
 def transform_item(item, ty):
     """
@@ -196,7 +239,8 @@ def transform_item(item, ty):
                 DisplayAdditional(name="Context", value=", ".join(item["contexts"]) if item["contexts"] else None, color="dodger_blue1"),
                 DisplayAdditional(name="Effort", value=item["effort"], color="blue"),
             ],
-            time=None,
+            # TODO: Also showing parent timestamps in a different colour, will need to modify the `DisplayItem` system
+            time=Timestamp(item["timestamp"]) if item["timestamp"] else None,
             people=item["people"],
         )
     elif ty == "projects":
@@ -208,7 +252,7 @@ def transform_item(item, ty):
                 DisplayAdditional(name="Deadline", value=datetime.strptime(item["deadline"], "%Y-%m-%dT%H:%M:%S") if item["deadline"] else None, color="red"),
                 DisplayAdditional(name="Priority", value=item["priority"], color="green4"),
             ],
-            time=None,
+            time=Timestamp(item["timestamp"]) if item["timestamp"] else None,
             people=[],
         )
     elif ty == "waitings":
@@ -301,41 +345,6 @@ class LeftJustifiedHeading(TextElement):
         text.justify = "left"
         yield Text(f"{' ' * (self.level - 1)}→ {text}")
 
-@group()
-def cal_dashboard(items: list[dict], ty: Literal["events"] | Literal["daily_notes"]):
-    """
-    Returns a day-by-day dashboard over the given events or daily notes. These aren't
-    combined anymore, but they are returned in a date-first dashboard, which is a different
-    format from the other data types.
-    """
-
-    # For events and daily notes, the current date doesn't matter
-    current_date = datetime.now().date()
-
-    # Collect everything on a per-day basis
-    dailies = {}
-    for item in items:
-        # Events get proper timestamps, daily notes just have a marker for which day they're on
-        if ty == "events":
-            date = datetime.strptime(item["timestamp"]["start"]["date"], "%Y-%m-%d").date()
-        elif ty == "daily_notes":
-            date = datetime.strptime(item["date"], "%Y-%m-%d").date()
-
-        if date not in dailies:
-            dailies[date] = []
-        dailies[date].append(item)
-
-    # Display the data one day at a time (guaranteed to be in order because order is
-    # maintained from insertion and Polaris returns them in order)
-    for idx, [date, items] in enumerate(dailies.items()):
-        yield Text.from_markup(f"[bold underline]{date.strftime('%A, %B %d')}[/bold underline]")
-        yield display_items(items, ty, current_date)
-
-        if idx != len(dailies):
-            yield Text()
-    if not items:
-        yield display_items([], ty, current_date)
-
 def build_dashboards(json: dict, current_date: date):
     """
     Converts the given action item data from Polaris into a series of displayable objects. This
@@ -352,28 +361,30 @@ def build_dashboards(json: dict, current_date: date):
         view_name_parts = view_name_str.split("__", 1)
         view_name = view_name_parts[0]
         view_pos = view_name_parts[1] if len(view_name_parts) > 1 else None
-        # The data is guaranteed be like `{"events": [..]}`
-        view_data_type, view_data = next(iter(view_data_map.items()))
-        if view_data_type == "events" or view_data_type == "daily_notes":
-            displayed = cal_dashboard(view_data, view_data_type)
-        elif view_data_type == "target_contexts":
+
+        # Detect and handle target contexts specially
+        if "target_contexts" in view_data_map:
+            tc_data = view_data_map["target_contexts"]
             # For target contexts, we need to display an independent mini-dashboard
             # for every context
             context_minis = []
-            for i, context_data in enumerate(sorted(view_data.items(), key=lambda x: x[0])):
+            for i, context_data in enumerate(sorted(tc_data.items(), key=lambda x: x[0])):
                 context, tasks = context_data
                 context_minis.append((context, Group(
                     # Title for the context
                     Text.from_markup(f"[bold]{context.replace('_', ' ').title()}[/bold]", justify="center"),
                     Text(),
-                    display_items(tasks, "tasks", current_date),
-                    Text() if i != len(view_data) - 1 else Group()
+                    display_items({"tasks": tasks}, "tasks", current_date),
+                    Text() if i != len(tc_data) - 1 else Group()
                 )))
 
             context_dashboards = [t[1] for t in context_minis]
             displayed = Group(*context_dashboards)
+
+            if len(view_data_map) > 1:
+                raise ValueError("target contextsb cannot be combined with other types in the same view yet")
         else:
-            displayed = display_items(view_data, view_data_type, current_date)
+            displayed = display_items(view_data_map, current_date)
 
         dashboards.append(PositionedDashboard(Panel(
             # Text.from_markup(f"[bold underline]{view_name}[/bold underline]", justify="center"),
