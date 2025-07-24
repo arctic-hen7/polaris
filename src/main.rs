@@ -160,7 +160,14 @@ fn main() -> Result<()> {
     #[cfg(feature = "goals")]
     for (view_name, filter) in views.goals {
         let goals = Goals::extract(filter.date, &args.starling_address)?;
-        views_data.insert(view_name, ViewData::Goals(goals));
+
+        let entry = views_data
+            .entry(view_name.clone())
+            .or_insert_with(ViewData::default);
+        if entry.goals.is_some() {
+            bail!("view `{}` has two filters the same type", view_name);
+        }
+        entry.goals = Some(goals);
     }
 
     match args.encoding {
@@ -196,7 +203,6 @@ struct ViewData {
     waitings: Option<Vec<Waiting>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     target_contexts: Option<HashMap<String, Vec<Task>>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg(feature = "goals")]
     #[serde(skip_serializing_if = "Option::is_none")]
     goals: Option<Goals>,

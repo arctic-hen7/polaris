@@ -1,5 +1,3 @@
-#[cfg(feature = "goals")]
-use crate::parse::Goals;
 use crate::{
     extractors::{DailyNote, Event, PersonDate, Project, Task, Tickle, Waiting},
     parse::{Priority, SimpleTimestamp},
