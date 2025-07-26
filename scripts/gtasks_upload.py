@@ -99,8 +99,6 @@ def push_to_google_tasks(items, token, task_list):
         if response.status_code != 200:
             print(f'Failed to push event: {response.text}')
 
-        sys.exit(1)
-
 def upload_to_gtasks(events, email="env:GOOGLE_EMAIL", task_list="My Tasks", service_account_path="env:GOOGLE_CALENDAR_CREDS"):
     """
     Uploads the given list items to Google Tasks.
