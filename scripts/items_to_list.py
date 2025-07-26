@@ -69,9 +69,9 @@ def items_to_list(items, earliest_date):
                     # Also schedule based on the deadline if we didn't get a timestamp
                     if not list_item["timestamp"]:
                         deadline = datetime.strptime(item["deadline"], "%Y-%m-%dT%H:%M:%S").date()
-                        item["timestamp"] = {
+                        list_item["timestamp"] = {
                             "start": {
-                                "date": deadline.isoformat() if deadline >= earliest_date else earliest_date,
+                                "date": deadline.isoformat() if deadline >= earliest_date else earliest_date.isoformat(),
                                 "time": None
                             },
                             "end": None,
@@ -80,10 +80,11 @@ def items_to_list(items, earliest_date):
                 if item["people"]:
                     body_parts.append("People: " + ", ".join([name for _, name in item["people"]]))
 
-                body_parts.append(f"\n{item['body'].strip()}")
+                if item["body"]:
+                    body_parts.append(f"\n{item['body'].strip()}")
                 list_item["body"] = "\n".join(body_parts)
 
-            list_item["body"] = list_item["body"].strip()
+            list_item["body"] = list_item["body"].strip() if list_item["body"] else ""
             transformed.append(list_item)
 
     return transformed
