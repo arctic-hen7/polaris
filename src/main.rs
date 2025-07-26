@@ -49,11 +49,12 @@ fn main() -> Result<()> {
                 .try_fold(HashMap::new(), |mut map, item_res| {
                     let item = item_res?; // Fail fast
                     for (name, filter) in $views {
+                        // Get the entry first to make sure we add all the type-specific entries
+                        // this view needs (otherwise the data format is uncertain)
+                        let entry = map.entry(name.to_string()).or_insert_with(Vec::new);
                         // If the item matches the filter, add it to the map under the view's name
                         if filter.matches(&item) {
-                            map.entry(name.to_string())
-                                .or_insert_with(Vec::new)
-                                .push(item.clone());
+                            entry.push(item.clone());
                         }
                     }
 
