@@ -3,6 +3,7 @@
 
 import os
 import json
+from typing import Optional
 import requests
 import jwt
 import sys
@@ -66,14 +67,15 @@ def get_task_list_id(list_name, token):
 
     raise Exception(f"Task list '{list_name}' not found.")
 
-def push_to_google_tasks(items, token, task_list):
+def upload_item(item, token, task_list: str, parent_id: Optional[str]):
     """
-    Pushes the given list items to Google Calendar, using the given access token.
+    Converts the given list item into an object to be pushed to Google Tasks. This takes
+    the task list to push to and the ID of the parent task.
     """
 
     headers = {"Authorization": f"Bearer {token}"}
 
-    for item in items:
+    if item["timestamp"]:
         ts_start = datetime.strptime(item["timestamp"]["start"]["date"], "%Y-%m-%d")
         ts_end = ts_start
         if item["timestamp"]["start"]["time"]:
@@ -82,22 +84,44 @@ def push_to_google_tasks(items, token, task_list):
             ts_end = datetime.strptime(item["timestamp"]["end"]["date"], "%Y-%m-%d")
             if item["timestamp"]["end"]["time"]:
                 ts_end = ts_end.replace(hour=int(item["timestamp"]["end"]["time"][:2]), minute=int(item["timestamp"]["end"]["time"][3:5]))
+    else:
+        ts_start = None
+        ts_end = None
 
-        item = {
-            "title": item["title"],
-            "notes": item["body"],
-            # Yes, we put this in UTC. No, Google does not read it as UTC. Does anything make sense? No, of course not.
-            "due": datetime.strftime(ts_start, "%Y-%m-%dT%H:%M:%S+00:00") if ts_start else None,
-            "status": "needsAction"
-        }
+    task_obj = {
+        "title": item["title"],
+        "notes": item["body"],
+        # Yes, we put this in UTC. No, Google does not read it as UTC. Does anything make sense? No, of course not.
+        "due": datetime.strftime(ts_start, "%Y-%m-%dT%H:%M:%S+00:00") if ts_start else None,
+        "status": "needsAction"
+    }
 
-        response = requests.post(
-            f"https://tasks.googleapis.com/tasks/v1/lists/{task_list}/tasks",
-            headers=headers,
-            json=item
-        )
-        if response.status_code != 200:
-            print(f'Failed to push event: {response.text}')
+    task_url = f"https://tasks.googleapis.com/tasks/v1/lists/{task_list}/tasks"
+    if parent_id:
+        task_url += f"?parent={parent_id}"
+
+    response = requests.post(
+        task_url,
+        headers=headers,
+        json=task_obj
+    )
+    if response.status_code != 200:
+        print(f'Failed to push event: {response.text}')
+        return
+
+    # If this task had subtasks, upload them all under it
+    if item["subtasks"]:
+        task_id = response.json().get("id")
+        for subtask in item["subtasks"]:
+            upload_item(subtask, token, task_list, task_id)
+
+def push_to_google_tasks(items, token, task_list):
+    """
+    Pushes the given list items to Google Calendar, using the given access token.
+    """
+
+    for item in items:
+        upload_item(item, token, task_list, parent_id=None)
 
 def upload_to_gtasks(events, email="env:GOOGLE_EMAIL", task_list="My Tasks", service_account_path="env:GOOGLE_CALENDAR_CREDS"):
     """
