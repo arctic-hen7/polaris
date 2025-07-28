@@ -288,7 +288,8 @@ displayTargetContexts(new Date(), new Date());
 
 // Populate the context/people dropdowns with the right options
 const contextSelect = document.getElementById("contextsSelect");
-for (const ctx of CONTEXTS) {
+const sortedContexts = CONTEXTS.slice().sort((a, b) => a.localeCompare(b));
+for (const ctx of sortedContexts) {
     const option = document.createElement("option");
     option.value = ctx;
     option.innerText = ctx
@@ -301,7 +302,8 @@ for (const ctx of CONTEXTS) {
     contextSelect.appendChild(option);
 }
 const peopleSelect = document.getElementById("peopleSelect");
-for (const person of PEOPLE) {
+const sortedPeople = PEOPLE.slice().sort((a, b) => a.localeCompare(b));
+for (const person of sortedPeople) {
     const option = document.createElement("option");
     option.value = person;
     option.innerText = person;
