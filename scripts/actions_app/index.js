@@ -80,7 +80,7 @@ const displayTargetContexts = (date, currentDate) => {
     document.getElementById("urgentContexts").innerHTML = "";
     for (const ctxIdx in targetContexts) {
         let html = `<h3 class="text-xl p-1 underline w-full bg-sky-300/20">${
-            ctxIdx === -1
+            ctxIdx === "-1"
                 ? "No Context"
                 : CONTEXTS[ctxIdx].charAt(0).toUpperCase() +
                     CONTEXTS[ctxIdx].slice(1)
