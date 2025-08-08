@@ -111,7 +111,7 @@ fn main() -> Result<()> {
     handle_items!(Task, tasks, &views.tasks, views_data);
 
     // Now go through the target contexts and accumulate
-    for (interim_name, (name, _)) in target_context_view_names
+    for (interim_name, (name, filter)) in target_context_view_names
         .iter()
         .zip(views.target_contexts.iter())
     {
@@ -131,11 +131,25 @@ fn main() -> Result<()> {
         // context bucket.
         let mut target_contexts = HashMap::new();
         for task in relevant_tasks {
-            for context in &task.contexts {
+            if filter.first_context_only && !task.contexts.is_empty() {
+                // Get the alphabetically first context (until `orgish` supports tag ordering...)
+                let first_context = task
+                    .contexts
+                    .iter()
+                    .min()
+                    // Guaranteed to be non-empty by the above check
+                    .unwrap();
                 target_contexts
-                    .entry(context.clone())
+                    .entry(first_context.clone())
                     .or_insert_with(Vec::new)
                     .push(task.clone());
+            } else {
+                for context in &task.contexts {
+                    target_contexts
+                        .entry(context.clone())
+                        .or_insert_with(Vec::new)
+                        .push(task.clone());
+                }
             }
             // If a task has no contexts, that's a special area
             if task.contexts.is_empty() {

@@ -136,6 +136,7 @@ impl View {
                 until,
                 include_with_timestamps: _,
                 include_with_parent_timestamps: _,
+                first_context_only: _,
             }) => Ok(Some(*until)),
             #[cfg(feature = "goals")]
             Self::Goals(GoalsFilter { date }) => Ok(Some(*date)),
@@ -437,6 +438,11 @@ pub struct TargetContextsFilter {
     #[arg(long, default_value = "false")]
     #[serde(default)]
     include_with_parent_timestamps: bool,
+    /// If true, tasks will only be recorded under their *first* context. By default, this is
+    /// false, and tasks will be recorded under each of their contexts.
+    #[arg(short = 'f', long, default_value = "false")]
+    #[serde(default)]
+    pub(crate) first_context_only: bool,
 }
 #[derive(Parser, Debug, Clone, Deserialize)]
 #[cfg(feature = "goals")]
