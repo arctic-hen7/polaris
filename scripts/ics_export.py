@@ -34,28 +34,30 @@ def cal_to_ics(events):
         if event["people"]:
             body += "\n\nPeople: \n- " + "\n- ".join([name for _, name in event["people"]])
 
-        ts_start = datetime.strptime(event["timestamp"]["start"]["date"], "%Y-%m-%d")
-        ts_end = ts_start
+        ts_start_raw = datetime.strptime(event["timestamp"]["start"]["date"], "%Y-%m-%d")
+        ts_end_raw = ts_start_raw
         if event["timestamp"]["start"]["time"]:
-            ts_start = ts_start.replace(hour=int(event["timestamp"]["start"]["time"][:2]), minute=int(event["timestamp"]["start"]["time"][3:5]))
+            ts_start_raw = ts_start_raw.replace(hour=int(event["timestamp"]["start"]["time"][:2]), minute=int(event["timestamp"]["start"]["time"][3:5]))
         if event["timestamp"]["end"]:
-            ts_end = datetime.strptime(event["timestamp"]["end"]["date"], "%Y-%m-%d")
+            ts_end_raw = datetime.strptime(event["timestamp"]["end"]["date"], "%Y-%m-%d")
             if event["timestamp"]["end"]["time"]:
-                ts_end = ts_end.replace(hour=int(event["timestamp"]["end"]["time"][:2]), minute=int(event["timestamp"]["end"]["time"][3:5]))
+                ts_end_raw = ts_end_raw.replace(hour=int(event["timestamp"]["end"]["time"][:2]), minute=int(event["timestamp"]["end"]["time"][3:5]))
 
         # Convert to UTC for uniformity
-        ts_start = LOCAL_TZ.localize(ts_start).astimezone(ZoneInfo("UTC"))
-        ts_end = LOCAL_TZ.localize(ts_end).astimezone(ZoneInfo("UTC")) if ts_end else None
+        ts_start_utc = LOCAL_TZ.localize(ts_start_raw).astimezone(ZoneInfo("UTC"))
+        ts_end_utc = LOCAL_TZ.localize(ts_end_raw).astimezone(ZoneInfo("UTC")) if ts_end_raw else None
 
         ev = Event(
             event["title"],
-            begin=ts_start,
+            begin=ts_start_utc,
             description=body.strip()
         )
-        if ts_end:
-            ev.end = ts_end
+        if ts_end_utc:
+            ev.end = ts_end_utc
         if not event["timestamp"]["start"]["time"] and not event["timestamp"]["end"]:
             ev.make_all_day()
+            # We need to change the start date to be un-localised!
+            ev.begin = ts_start_raw
         if event["location"]:
             ev.location = event["location"]
 
