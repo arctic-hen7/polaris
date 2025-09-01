@@ -45,7 +45,7 @@ def transform_item(item, earliest_date):
     else:
         # For tasks, we have some more things to insert into the body
         body_parts = []
-        body_parts.append("**Contexts: " + ", ".join([c.replace("_", " ").title() for c in item["contexts"]]) + "**" if item["contexts"] else "**Contexts: (None)**")
+        body_parts.append("**Contexts: " + ", ".join([c.replace("_", " ").title() for c in item["contexts"]]) + "**" if item.get("contexts") else "**Contexts: (None)**")
         body_parts.append(f"Priority: {item['priority'].capitalize()}")
 
         # Take the date from the start of the timestamp
@@ -73,7 +73,7 @@ def transform_item(item, earliest_date):
                     "end": None,
                 }
 
-        if item["people"]:
+        if item.get("people"):
             body_parts.append("People: " + ", ".join([name for _, name in item["people"]]))
 
         if item["body"]:
