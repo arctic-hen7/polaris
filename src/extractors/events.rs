@@ -53,8 +53,8 @@ impl Event {
                     })
                 })
             } else {
-                // No daily notes, waiting items, tasks, or projects are events
-                // NOTE: Used to be that we would catch tasks and projects with timestamps, they're
+                // No daily notes, waiting items, tasks, or stacks are events
+                // NOTE: Used to be that we would catch tasks and stacks with timestamps, they're
                 // now handled in their own pipelines.
                 None
             }

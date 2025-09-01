@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Something being waited for. These will usually either exist in isolation, or as part of
-/// projects, before `NEXT` tasks. As such, like actionable tasks, the scheduled and deadline dates
-/// of waiting items will be adjusted for their parent project's non-actionable tasks.
+/// stacks, before `NEXT` tasks. As such, like actionable tasks, the scheduled and deadline dates
+/// of waiting items will be adjusted for their parent stack's non-actionable tasks.
 #[derive(Serialize, Clone, Debug)]
 pub struct Waiting {
     /// The ID of the node corresponding to this waiting item.

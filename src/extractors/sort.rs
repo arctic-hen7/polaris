@@ -1,4 +1,4 @@
-use super::{DailyNote, Event, PersonDate, Project, Task, Tickle, Waiting};
+use super::{DailyNote, Event, PersonDate, Stack, Task, Tickle, Waiting};
 use crate::parse::Priority;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 
@@ -81,7 +81,7 @@ impl Waiting {
     }
 }
 
-impl Project {
+impl Stack {
     pub fn sort_key(&self) -> (NaiveDate, NaiveTime, ScheduledDeadline, Priority, String) {
         (
             self.timestamp

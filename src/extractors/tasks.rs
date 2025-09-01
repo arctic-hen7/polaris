@@ -9,7 +9,7 @@ use uuid::Uuid;
 /// From the information in each task, the user can schedule them for particular times/days, or
 /// simply leave them and do them when convenient.
 ///
-/// Tasks with their own timestamps, or tasks which are part of projects with timestamps, will not
+/// Tasks with their own timestamps, or tasks which are part of stacks with timestamps, will not
 /// appear here, as they're considered handled. Non-actionable tasks, however, will.
 #[derive(Serialize, Clone, Debug)]
 pub struct Task {
@@ -23,23 +23,23 @@ pub struct Task {
     pub can_start: bool,
     /// A timestamp stating when exactly this task should be done, if it has one.
     pub timestamp: Option<SimpleTimestamp>,
-    /// The timestamp on the parent project, if it has one. This is returned separately for maximum
+    /// The timestamp on the parent stack, if it has one. This is returned separately for maximum
     /// flexibility with how the caller wants to handle situations involving both a task and a
-    /// project timestamp.
+    /// stack timestamp.
     pub parent_timestamp: Option<SimpleTimestamp>,
     /// The date by which this task should be started. If an earlier date is present on the parent
-    /// project, that will be used. This is required to be before whatever the computed deadline
+    /// stack, that will be used. This is required to be before whatever the computed deadline
     /// is, or an error will be thrown.
     pub scheduled: Option<NaiveDateTime>,
     /// The date by which this task must be completed. This may be computed by several rules
-    /// against the parent project and non-actionable tasks.
+    /// against the parent stack and non-actionable tasks.
     pub deadline: Option<NaiveDateTime>,
     /// The priority of the task, which will be the highest priority in the path from the node
     /// corresponding to this task to the root of its file (i.e. the highest parent priority).
     pub priority: Priority,
-    /// Whether or not the parent project of this task has other, non-actionable tasks. This should
+    /// Whether or not the parent stack of this task has other, non-actionable tasks. This should
     /// be displayed to the user just to make sure they don't get caught unaware.
-    pub project_has_non_actionable: bool,
+    pub stack_has_non_actionable: bool,
     /// The effort required to complete this task.
     pub effort: Effort,
     /// The contexts required to complete this task.
@@ -96,7 +96,7 @@ impl Task {
                         );
                     }
 
-                    // NOTE: We used to block if either the primary on the task or its project
+                    // NOTE: We used to block if either the primary on the task or its stack
                     // existed because those would go through the events pipeline, now we return
                     // them actively and allow filtering for them.
                     Ok(Some(Self {
@@ -109,7 +109,7 @@ impl Task {
                         scheduled,
                         deadline,
                         priority: computed_priority.unwrap_or(*priority),
-                        project_has_non_actionable: has_next_tasks,
+                        stack_has_non_actionable: has_next_tasks,
                         effort: *effort,
                         contexts: contexts.clone(),
                         people: people.clone(),
@@ -124,29 +124,29 @@ impl Task {
 
 /// Computes scheduled and deadline dates from the parent of the given action item. If the action
 /// item is an actionable task or waiting item, this will also cross-inherit from non-actionable
-/// tasks on the same project (this won't be done for other non-actionable tasks). This will also
-/// return whether or not there are related non-actionable tasks on the same project as the given
+/// tasks on the same stack (this won't be done for other non-actionable tasks). This will also
+/// return whether or not there are related non-actionable tasks on the same stack as the given
 /// item.
 ///
 /// The primary timestamp on the given repeat data will be the parent's timestamp.
 ///
 /// # Methodology
 ///
-/// 1. Check if the task has a parent project in the map of action items
+/// 1. Check if the task has a parent stack in the map of action items
 /// 2. If we don't have our own scheduled/deadline dates, use ones from the same-index repeat of
-/// the parent project
-/// 3. If our deadline is later that the project's (if it exists), throw an error
+/// the parent stack
+/// 3. If our deadline is later that the stack's (if it exists), throw an error
 /// 4. Check if any of the child tasks are non-actionable
 /// 5. If they are, go through them and find the earliest scheduled/deadline date among them
-/// 6. If there wasn't one, use the project deadline instead, if it exists; call *one day before*
+/// 6. If there wasn't one, use the stack deadline instead, if it exists; call *one day before*
 ///    whichever we used the computed deadline
-/// 7. If there were *no* non-actionable tasks, set the computed deadline to the project deadline
+/// 7. If there were *no* non-actionable tasks, set the computed deadline to the stack deadline
 ///    itself
 /// 8. If we have a computed deadline, set our deadline to the earlier of what it originally was,
 ///    and the computed one
 /// 9. If the scheduled date we have is after whatever our deadline now is, throw an error (noting
 ///    whether or not the deadline was computed)
-/// 10. Take the later of a timestamp on this task and a timestamp on the parent project, if either
+/// 10. Take the later of a timestamp on this task and a timestamp on the parent stack, if either
 ///     exist, and accumulate a warning if that timestamp is after what's now this task's deadline
 ///
 /// # Panics
@@ -164,7 +164,7 @@ pub fn compute_from_parent(
 
     let mut parent_ts = None;
     let mut has_next_tasks = false;
-    if let Some(parent @ ActionItem::Project { child_items, .. }) =
+    if let Some(parent @ ActionItem::Stack { child_items, .. }) =
         item.base().parent_id.map(|id| map.get(&id)).flatten()
     {
         // Just blindly rely on the same-index repeat from the parent, there's not
@@ -173,7 +173,7 @@ pub fn compute_from_parent(
         if let Some(parent_repeat) = parent.base().repeats.get(repeat_idx) {
             parent_ts = parent_repeat.primary.clone();
 
-            // Inherit the parent project's scheduled/deadline dates if we don't have
+            // Inherit the parent stack's scheduled/deadline dates if we don't have
             // our own
             if scheduled.is_none() && parent_repeat.scheduled.is_some() {
                 scheduled = parent_repeat.scheduled.clone();
@@ -182,12 +182,12 @@ pub fn compute_from_parent(
                 deadline = parent_repeat.deadline.clone();
             }
 
-            // Make sure our deadline is before the project's
+            // Make sure our deadline is before the stack's
             if parent_repeat.deadline.is_some()
                 && deadline.unwrap() > parent_repeat.deadline.unwrap()
             {
                 bail!(
-                    "item {} has a deadline after that of its parent project",
+                    "item {} has a deadline after that of its parent stack",
                     item.base().id
                 );
             }
@@ -201,10 +201,10 @@ pub fn compute_from_parent(
                     ..
                 } | ActionItem::Waiting { .. }
             ) {
-                // Check if any of the other children of this project are non-actionable
+                // Check if any of the other children of this stack are non-actionable
                 // tasks (we don't need to change any of our behaviour for waiting items).
                 // If there are some, find the earliest scheduled/deadline date among them,
-                // falling back to the project deadline, if there is one.
+                // falling back to the stack deadline, if there is one.
                 let mut earliest_imposed_deadline = parent_repeat.deadline.min(repeat.deadline);
                 for child_id in child_items {
                     if let ActionItem::Task {
@@ -229,7 +229,7 @@ pub fn compute_from_parent(
                 // non-actionable tasks make it one day before whenever we have to start
                 // those to provide wiggle room. We don't need to do this if we aren't checking
                 // cross-inheritance, because we wouldn't have any next tasks, and the deadline
-                // is already guaranteed to be before that of the parent project.
+                // is already guaranteed to be before that of the parent stack.
                 if let Some(imposed_deadline) = earliest_imposed_deadline {
                     deadline = Some(if has_next_tasks {
                         imposed_deadline - Duration::days(1)

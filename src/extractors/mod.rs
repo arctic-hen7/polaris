@@ -1,8 +1,8 @@
 mod daily_notes;
 mod events;
 mod people_dates;
-mod projects;
 mod sort;
+mod stacks;
 mod tasks;
 mod tickles;
 mod waiting;
@@ -10,7 +10,7 @@ mod waiting;
 pub use daily_notes::DailyNote;
 pub use events::Event;
 pub use people_dates::PersonDate;
-pub use projects::Project;
+pub use stacks::Stack;
 pub use tasks::Task;
 pub use tickles::Tickle;
 pub use waiting::Waiting;

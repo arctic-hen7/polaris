@@ -94,7 +94,7 @@ fn main() -> Result<()> {
     handle_items!(DailyNote, daily_notes, &views.daily_notes, views_data);
     handle_items!(Tickle, tickles, &views.tickles, views_data);
     handle_items!(PersonDate, person_dates, &views.dates, views_data);
-    handle_items!(Project, projects, &views.projects, views_data);
+    handle_items!(Stack, stacks, &views.stacks, views_data);
     handle_items!(Waiting, waitings, &views.waits, views_data);
     handle_items!(PersonDate, person_dates, &views.dates, views_data);
     // We inject extra filters for all the target context views so we can easily iterate over the
@@ -213,7 +213,7 @@ struct ViewData {
     #[serde(skip_serializing_if = "Option::is_none")]
     tasks: Option<Vec<Task>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    projects: Option<Vec<Project>>,
+    stacks: Option<Vec<Stack>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     waitings: Option<Vec<Waiting>>,
     #[serde(skip_serializing_if = "Option::is_none")]

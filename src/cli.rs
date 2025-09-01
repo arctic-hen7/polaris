@@ -76,7 +76,7 @@ impl Cli {
             tickles: Vec::new(),
             dates: Vec::new(),
             waits: Vec::new(),
-            projects: Vec::new(),
+            stacks: Vec::new(),
             tasks: Vec::new(),
             target_contexts: Vec::new(),
             #[cfg(feature = "goals")]
@@ -98,7 +98,7 @@ impl Cli {
                 View::Tickles(filter) => all_views.tickles.push((named_view.name, filter)),
                 View::Dates(filter) => all_views.dates.push((named_view.name, filter)),
                 View::Waits(filter) => all_views.waits.push((named_view.name, filter)),
-                View::Projects(filter) => all_views.projects.push((named_view.name, filter)),
+                View::Stacks(filter) => all_views.stacks.push((named_view.name, filter)),
                 View::Tasks(filter) => all_views.tasks.push((named_view.name, filter)),
                 View::TargetContexts(filter) => {
                     all_views.target_contexts.push((named_view.name, filter))

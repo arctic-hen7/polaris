@@ -1,5 +1,5 @@
 use crate::{
-    extractors::{DailyNote, Event, PersonDate, Project, Task, Tickle, Waiting},
+    extractors::{DailyNote, Event, PersonDate, Stack, Task, Tickle, Waiting},
     parse::{Priority, SimpleTimestamp},
 };
 use anyhow::{bail, Error};
@@ -30,9 +30,9 @@ pub enum View {
     /// Items with the `WAIT` keyword, used to track things the user is waiting on from others.
     /// These are typically organised with scheduled and deadline dates.
     Waits(WaitsFilter),
-    /// Items with the `PROJ` keyword, used to track groups of tasks with overarching
+    /// Items with the `STACK` keyword, used to track groups of tasks with overarching
     /// scheduled/deadline dates.
-    Projects(ProjectsFilter),
+    Stacks(StacksFilter),
     /// Items with the `TODO` or `NEXT` keyword, which indicate tasks that the user should
     /// complete. These are organised with a combination of scheduled/deadline dates, "contexts"
     /// (which might represent the place the task can be completed in, something about the
@@ -40,7 +40,7 @@ pub enum View {
     ///
     /// Tasks with the `TODO` keyword are considered immediately actionable, whereas those with the
     /// `NEXT` keyword are non-actionable (typically after some other actionable ones are
-    /// completed, within the same project).
+    /// completed, within the same stack).
     Tasks(TasksFilter),
     /// If specified, a list of contexts that need to be "entered" to complete all tasks by the
     /// given date will be produced, including the details of those tasks which need to be
@@ -88,7 +88,7 @@ impl View {
                 }
                 Ok(scheduled.or(*deadline))
             }
-            Self::Projects(ProjectsFilter {
+            Self::Stacks(StacksFilter {
                 from,
                 until,
                 scheduled,
@@ -251,14 +251,14 @@ impl WaitsFilter {
     }
 }
 #[derive(Parser, Debug, Clone, Deserialize)]
-pub struct ProjectsFilter {
-    /// The date from which to show projects with timestamps.
+pub struct StacksFilter {
+    /// The date from which to show stacks with timestamps.
     #[arg(short, long)]
     from: Option<NaiveDate>,
-    /// The date at which to stop showing projects with timestamps (inclusive).
+    /// The date at which to stop showing stacks with timestamps (inclusive).
     #[arg(short, long)]
     until: Option<NaiveDate>,
-    /// How we should match on the project's timestamp.
+    /// How we should match on the stack's timestamp.
     #[arg(short, long, alias = "ts_match", default_value = "all")]
     #[serde(default)]
     timestamp_match: TimestampMatch,
@@ -280,8 +280,8 @@ pub struct ProjectsFilter {
     #[serde(default)]
     planning_match: PlanningMatchType,
 }
-impl ProjectsFilter {
-    pub fn matches(&self, p: &Project) -> bool {
+impl StacksFilter {
+    pub fn matches(&self, p: &Stack) -> bool {
         meets_dt(
             p.scheduled,
             self.scheduled,
@@ -433,7 +433,7 @@ pub struct TargetContextsFilter {
     #[arg(long, default_value = "false")]
     #[serde(default)]
     include_with_timestamps: bool,
-    /// Whether or not to include tasks with *parent* primary timestamps (i.e. whose projects have
+    /// Whether or not to include tasks with *parent* primary timestamps (i.e. whose stacks have
     /// been slated for a particular time).
     #[arg(long, default_value = "false")]
     #[serde(default)]
@@ -560,7 +560,7 @@ pub struct AllViews {
     pub tickles: Vec<(String, TicklesFilter)>,
     pub dates: Vec<(String, DatesFilter)>,
     pub waits: Vec<(String, WaitsFilter)>,
-    pub projects: Vec<(String, ProjectsFilter)>,
+    pub stacks: Vec<(String, StacksFilter)>,
     pub tasks: Vec<(String, TasksFilter)>,
     pub target_contexts: Vec<(String, TargetContextsFilter)>,
     #[cfg(feature = "goals")]
@@ -582,7 +582,7 @@ impl AllViews {
             .chain(self.tickles.iter().map(|(name, _)| name))
             .chain(self.dates.iter().map(|(name, _)| name))
             .chain(self.waits.iter().map(|(name, _)| name))
-            .chain(self.projects.iter().map(|(name, _)| name))
+            .chain(self.stacks.iter().map(|(name, _)| name))
             .chain(self.tasks.iter().map(|(name, _)| name))
             .chain(self.target_contexts.iter().map(|(name, _)| name));
         #[cfg(feature = "goals")]

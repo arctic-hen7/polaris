@@ -45,11 +45,11 @@ pub fn node_to_action_item(node: Node, repeats: Vec<ActionItemRepeat>) -> Result
                         .ok_or(anyhow!("no SENT property on waiting node {}", node.id))??,
                 }),
                 "NOTE" => Ok(ActionItem::Note { base }),
-                "PROJ" => {
-                    // Make sure there is at least one actionable item in this project (i.e. one
+                "STACK" => {
+                    // Make sure there is at least one actionable item in this stack (i.e. one
                     // `TODO`)
 
-                    Ok(ActionItem::Project {
+                    Ok(ActionItem::Stack {
                         base,
                         priority: Priority::from_node(&node)?,
                         computed_priority: None, // Later
@@ -93,7 +93,7 @@ pub fn fill_action_item(id: Uuid, map: &mut HashMap<Uuid, ActionItem>) {
                 }
             }
         }
-        ActionItem::Project {
+        ActionItem::Stack {
             base,
             priority,
             computed_priority,
@@ -125,18 +125,18 @@ pub fn fill_action_item(id: Uuid, map: &mut HashMap<Uuid, ActionItem>) {
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ActionItem {
-    Project {
+    Stack {
         base: BaseActionItem,
 
-        /// The priority of this project. If a higher value is present in the task's parent
-        /// project(s), that value will be used.
+        /// The priority of this stack. If a higher value is present in the task's parent
+        /// stack(s), that value will be used.
         priority: Priority,
-        /// A higher priority computed for this project by looking at the priorities of parent
-        /// projects.
+        /// A higher priority computed for this stack by looking at the priorities of parent
+        /// stack.
         ///
         /// This is computed in the second passthrough, and will initially be `false`.
         computed_priority: Option<Priority>,
-        /// The IDs of the child action items under this project (including `WAIT` items).
+        /// The IDs of the child action items under this stack (including `WAIT` items).
         ///
         /// In the first pass, the IDs of all the children will be listed, and this will be
         /// filtered and resolved to real tasks in the second pass.
@@ -146,10 +146,10 @@ pub enum ActionItem {
         base: BaseActionItem,
 
         /// The priority of this task. If a higher value is present in the task's parent
-        /// project(s), that value will be used.
+        /// stack(s), that value will be used.
         priority: Priority,
         /// A higher priority computed for this task by looking at the priorities of parent
-        /// projects.
+        /// stack.
         ///
         /// This is computed in the second passthrough, and will initially be `false`.
         computed_priority: Option<Priority>,
@@ -189,7 +189,7 @@ impl ActionItem {
     pub fn base(&self) -> &BaseActionItem {
         match &self {
             Self::Task { base, .. }
-            | Self::Project { base, .. }
+            | Self::Stack { base, .. }
             | Self::Waiting { base, .. }
             | Self::Note { base, .. }
             | Self::None { base, .. } => base,
@@ -210,7 +210,8 @@ pub struct BaseActionItem {
     pub parent_tags: HashSet<String>,
     /// The ID of the parent node, if there is one.
     pub parent_id: Option<Uuid>,
-    /// The repeats of this action item.
+    /// The repeats of this action item. There is guaranteed to be at least one repeat (even if it
+    /// doesn't have any timestamps associated with it) for every action item.
     pub repeats: Vec<ActionItemRepeat>,
 }
 
@@ -288,7 +289,7 @@ impl Effort {
     // }
 }
 
-/// The priority of a task or project.
+/// The priority of a task or stack.
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, ValueEnum, Debug)]
 #[serde(rename_all = "snake_case")]
 #[clap(rename_all = "snake_case")]
@@ -349,15 +350,15 @@ fn people_from_node(node: &Node) -> Result<Vec<(Uuid, String)>> {
 }
 
 /// Computes the priority of the action item with the given ID by looking recursively through its
-/// parent projects to find the highest priority. Even though recursive schedule-involved projects
-/// are not used in the system, this is done to allow "meta-projects" to be given priorities that
+/// parent stacks to find the highest priority. Even though recursive schedule-involved stacks
+/// are not used in the system, this is done to allow "meta-stack" to be given priorities that
 /// filter through to their underlying tasks.
 ///
 /// This will return `None` if the given ID is not in the map.
 fn inherit_priority(id: Uuid, map: &HashMap<Uuid, ActionItem>) -> Option<Priority> {
     let mut highest_priority = Priority::Low;
     let mut current = Some(map.get(&id)?);
-    while let Some(ActionItem::Project { priority, .. }) = current {
+    while let Some(ActionItem::Stack { priority, .. }) = current {
         if *priority > highest_priority {
             highest_priority = *priority;
         }
