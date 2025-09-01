@@ -243,7 +243,7 @@ def transform_item(item, ty):
             time=Timestamp(item["timestamp"]) if item["timestamp"] else None,
             people=item["people"],
         )
-    elif ty == "projects":
+    elif ty == "stacks":
         return DisplayItem(
             title=item["title"],
             body=item["body"],
