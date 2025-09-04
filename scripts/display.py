@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # Displays the given Polaris content.
 
 from datetime import date, datetime
