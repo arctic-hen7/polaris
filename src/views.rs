@@ -120,6 +120,24 @@ impl View {
                 min_priority: _,
                 max_priority: _,
                 people: _,
+            })
+            | Self::TargetContexts(TargetContextsFilter {
+                tasks_filter:
+                    TasksFilter {
+                        from,
+                        until,
+                        scheduled,
+                        deadline,
+                        timestamp_match: _,
+                        parent_timestamp_match: _,
+                        planning_match: _,
+                        next_tasks: _,
+                        contexts: _,
+                        min_priority: _,
+                        max_priority: _,
+                        people: _,
+                    },
+                first_context_only: _,
             }) => {
                 if deadline.is_some_and(|d| scheduled.is_some_and(|s| d < s)) {
                     bail!("`deadline` date must be after `scheduled` date");
@@ -132,12 +150,6 @@ impl View {
 
                 Ok(sd.max(fu))
             }
-            Self::TargetContexts(TargetContextsFilter {
-                until,
-                include_with_timestamps: _,
-                include_with_parent_timestamps: _,
-                first_context_only: _,
-            }) => Ok(Some(*until)),
             #[cfg(feature = "goals")]
             Self::Goals(GoalsFilter { date }) => Ok(Some(*date)),
         }
@@ -399,48 +411,16 @@ impl TasksFilter {
     /// Creates a new filter for tasks that are relevant to determining the target contexts that
     /// meet the given [`TargetContextsFilter`].
     pub fn for_target_contexts(filter: &TargetContextsFilter) -> Self {
-        Self {
-            from: None,
-            until: None,
-            timestamp_match: if filter.include_with_timestamps {
-                TimestampMatch::All
-            } else {
-                TimestampMatch::OnlyWithout
-            },
-            parent_timestamp_match: if filter.include_with_parent_timestamps {
-                TimestampMatch::All
-            } else {
-                TimestampMatch::OnlyWithout
-            },
-            scheduled: None,
-            deadline: Some(filter.until),
-            planning_match: PlanningMatchType::DeadlineOnly,
-            next_tasks: true,
-            contexts: None,
-            min_priority: None,
-            max_priority: None,
-            people: None,
-        }
+        filter.tasks_filter.clone()
     }
 }
 #[derive(Parser, Debug, Clone, Deserialize)]
 pub struct TargetContextsFilter {
-    /// The date by which all tasks should be completed. This will be used to filter tasks by
-    /// their deadlines, and the contexts for those tasks will be produced.
-    #[arg(short, long)]
-    until: NaiveDate,
-    /// Whether or not to include tasks with *their own* primary timestamps.
-    #[arg(long, default_value = "false")]
-    #[serde(default)]
-    include_with_timestamps: bool,
-    /// Whether or not to include tasks with *parent* primary timestamps (i.e. whose stacks have
-    /// been slated for a particular time).
-    #[arg(long, default_value = "false")]
-    #[serde(default)]
-    include_with_parent_timestamps: bool,
+    #[clap(flatten)]
+    tasks_filter: TasksFilter,
     /// If true, tasks will only be recorded under their *first* context. By default, this is
     /// false, and tasks will be recorded under each of their contexts.
-    #[arg(short = 'f', long, default_value = "false")]
+    #[arg(long, default_value = "false")]
     #[serde(default)]
     pub(crate) first_context_only: bool,
 }
