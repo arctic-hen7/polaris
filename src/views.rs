@@ -417,6 +417,7 @@ impl TasksFilter {
 #[derive(Parser, Debug, Clone, Deserialize)]
 pub struct TargetContextsFilter {
     #[clap(flatten)]
+    #[serde(flatten)]
     tasks_filter: TasksFilter,
     /// If true, tasks will only be recorded under their *first* context. By default, this is
     /// false, and tasks will be recorded under each of their contexts.
