@@ -50,7 +50,7 @@ def get_access_token(service_account_info, scope, impersonate=None):
     else:
         raise Exception(f"Failed to get action items: {response.text}")
 
-def push_to_google_calendar(events, token, calendar):
+def push_to_google_calendar(items, token, calendar, all_day_events):
     """
     Pushes the given calendar entries to Google Calendar, using the given access token.
     """
@@ -58,26 +58,20 @@ def push_to_google_calendar(events, token, calendar):
     headers = {"Authorization": f"Bearer {token}"}
     local_tz = datetime.now().astimezone().tzinfo
 
-    for event in events:
-        ts_start = datetime.strptime(event["timestamp"]["start"]["date"], "%Y-%m-%d")
-        ts_end = ts_start
-        if event["timestamp"]["start"]["time"]:
-            ts_start = ts_start.replace(hour=int(event["timestamp"]["start"]["time"][:2]), minute=int(event["timestamp"]["start"]["time"][3:5]))
-        if event["timestamp"]["end"]:
-            ts_end = datetime.strptime(event["timestamp"]["end"]["date"], "%Y-%m-%d")
-            if event["timestamp"]["end"]["time"]:
-                ts_end = ts_end.replace(hour=int(event["timestamp"]["end"]["time"][:2]), minute=int(event["timestamp"]["end"]["time"][3:5]))
-
-        # Form the body from the regular body and the associated people, if there are any
-        body = event["body"] or ""
-        if event["people"]:
-            body += "\n\nPeople: \n- " + "\n- ".join([name for _, name in event["people"]])
+    for item in items:
+        ts_start_local = datetime.strptime(item["start"], "%Y-%m-%dT%H:%M:%S") if item["start"] else None
+        ts_end_local = datetime.strptime(item["end"], "%Y-%m-%dT%H:%M:%S") if item["end"] else None
+        if not ts_start_local:
+            return
 
         # Localise the timestamps first (GCal needs this)
-        ts_start = ts_start.replace(tzinfo=local_tz)
-        ts_end = ts_end.replace(tzinfo=local_tz) if ts_end else None
+        ts_start = ts_start_local.replace(tzinfo=local_tz)
+        ts_end = ts_end_local.replace(tzinfo=local_tz) if ts_end_local else None
 
-        if not event["timestamp"]["start"]["time"] and not event["timestamp"]["end"]:
+        # Detect all-day events
+        if not ts_end and ts_start_local.time() == datetime.min.time():
+            if not all_day_events:
+                continue
             start = {"date": ts_start.date().isoformat()}
             end = {"date": ts_start.date().isoformat()}
         else:
@@ -85,9 +79,9 @@ def push_to_google_calendar(events, token, calendar):
             end = {"dateTime": ts_end.isoformat()} if ts_end else None
 
         event = {
-            "summary": event["title"],
-            "description": body,
-            "location": event["location"],
+            "summary": item["title"],
+            "description": item["body"],
+            "location": item["location"],
             "start": start,
             "end": end
         }
@@ -100,7 +94,7 @@ def push_to_google_calendar(events, token, calendar):
         if response.status_code != 200:
             print(f'Failed to push event: {response.text}')
 
-def upload_to_gcal(events, email="env:GOOGLE_EMAIL", calendar="primary", service_account_path="env:GOOGLE_CALENDAR_CREDS"):
+def upload_to_gcal(events, all_day_events, email="env:GOOGLE_EMAIL", calendar="primary", service_account_path="env:GOOGLE_CALENDAR_CREDS"):
     """
     Uploads the given calendar items to Google Calendar
 
@@ -124,8 +118,14 @@ def upload_to_gcal(events, email="env:GOOGLE_EMAIL", calendar="primary", service
             raise Exception(f"No client email in `{env_var}`")
 
     token = get_access_token(service_account_info, GOOGLE_SCOPE, impersonate=email)
-    push_to_google_calendar(events, token, calendar)
+    push_to_google_calendar(events, token, calendar, all_day_events)
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Upload action items to Google Calendar.")
+    parser.add_argument("-n", "--no-all-day", action="store_true", help="Disable all-day events")
+    args = parser.parse_args()
+
     data = json.load(sys.stdin)
-    upload_to_gcal(data)
+    upload_to_gcal(data, not args.no_all_day)

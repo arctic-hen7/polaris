@@ -2,6 +2,9 @@
 # A scheduling script that takes an array of action items from stdin and prints an ICS file
 # containing all action items with timestamps. This is intended to be composed with other scripts
 # that filter those items.
+#
+# This can be told to disallow all-day events, which can be used to feed it *tasks* rather than
+# events, and it will only export those with a clear start and end time.
 
 import json
 import sys
@@ -22,46 +25,43 @@ END:STANDARD
 END:VTIMEZONE
 """
 
-def cal_to_ics(events):
+def cal_to_ics(items, all_day_events):
     """
     Converts the given list of action items to an ICS calendar string.
     """
 
     calendar = Calendar()
-    for event in events:
-        # Form the body from the regular body and the associated people, if there are any
-        body = event["body"] or ""
-        if event["people"]:
-            body += "\n\nPeople: \n- " + "\n- ".join([name for _, name in event["people"]])
+    for item in items:
+        ts_start_local = datetime.strptime(item["start"], "%Y-%m-%dT%H:%M:%S") if item["start"] else None
+        ts_end_local = datetime.strptime(item["end"], "%Y-%m-%dT%H:%M:%S") if item["end"] else None
+        if not ts_start_local:
+            continue
+        else:
+            # Convert the timestamps to UTC for uniformity
+            ts_start_utc = LOCAL_TZ.localize(ts_start_local).astimezone(ZoneInfo("UTC"))
+            ts_end_utc = LOCAL_TZ.localize(ts_end_local).astimezone(ZoneInfo("UTC")) if ts_end_local else None
 
-        ts_start_raw = datetime.strptime(event["timestamp"]["start"]["date"], "%Y-%m-%d")
-        ts_end_raw = ts_start_raw
-        if event["timestamp"]["start"]["time"]:
-            ts_start_raw = ts_start_raw.replace(hour=int(event["timestamp"]["start"]["time"][:2]), minute=int(event["timestamp"]["start"]["time"][3:5]))
-        if event["timestamp"]["end"]:
-            ts_end_raw = datetime.strptime(event["timestamp"]["end"]["date"], "%Y-%m-%d")
-            if event["timestamp"]["end"]["time"]:
-                ts_end_raw = ts_end_raw.replace(hour=int(event["timestamp"]["end"]["time"][:2]), minute=int(event["timestamp"]["end"]["time"][3:5]))
+            ev = Event(
+                item["title"],
+                begin=ts_start_utc,
+                # The body will already have all the information we need in it about people, etc.
+                description=item["body"].strip()
+            )
+            if item["location"]:
+                ev.location = item["location"]
 
-        # Convert to UTC for uniformity
-        ts_start_utc = LOCAL_TZ.localize(ts_start_raw).astimezone(ZoneInfo("UTC"))
-        ts_end_utc = LOCAL_TZ.localize(ts_end_raw).astimezone(ZoneInfo("UTC")) if ts_end_raw else None
+            if ts_end_utc:
+                ev.end = ts_end_utc
 
-        ev = Event(
-            event["title"],
-            begin=ts_start_utc,
-            description=body.strip()
-        )
-        if ts_end_utc:
-            ev.end = ts_end_utc
-        if not event["timestamp"]["start"]["time"] and not event["timestamp"]["end"]:
-            ev.make_all_day()
-            # We need to change the start date to be un-localised!
-            ev.begin = ts_start_raw
-        if event["location"]:
-            ev.location = event["location"]
+            # All-day events will arrive as events with no end datetime, and a start time of `00:00`
+            if not ts_end_utc and ts_start_local.time() == datetime.min.time():
+                if not all_day_events:
+                    continue
+                ev.make_all_day()
+                # We need to change the start date to be un-localised!
+                ev.begin = ts_start_local
 
-        calendar.events.add(ev)
+            calendar.events.add(ev)
 
     ics_str = calendar.serialize()
     # Need to add a VTIMEZONE block for UTC, otherwise GCal freaks out
@@ -73,7 +73,13 @@ def cal_to_ics(events):
     return ics_str_with_tz
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Convert action items to an ICS calendar.")
+    parser.add_argument("-n", "--no-all-day", action="store_true", help="Disable all-day events")
+    args = parser.parse_args()
+
     data = json.load(sys.stdin)
 
-    ics_str = cal_to_ics(data)
+    ics_str = cal_to_ics(data, not args.no_all_day)
     print(ics_str)

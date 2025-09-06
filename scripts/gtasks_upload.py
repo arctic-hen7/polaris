@@ -75,18 +75,13 @@ def upload_item(item, token, task_list: str, parent_id: Optional[str]):
 
     headers = {"Authorization": f"Bearer {token}"}
 
-    if item["timestamp"]:
-        ts_start = datetime.strptime(item["timestamp"]["start"]["date"], "%Y-%m-%d")
-        ts_end = ts_start
-        if item["timestamp"]["start"]["time"]:
-            ts_start = ts_start.replace(hour=int(item["timestamp"]["start"]["time"][:2]), minute=int(item["timestamp"]["start"]["time"][3:5]))
-        if item["timestamp"]["end"]:
-            ts_end = datetime.strptime(item["timestamp"]["end"]["date"], "%Y-%m-%d")
-            if item["timestamp"]["end"]["time"]:
-                ts_end = ts_end.replace(hour=int(item["timestamp"]["end"]["time"][:2]), minute=int(item["timestamp"]["end"]["time"][3:5]))
-    else:
-        ts_start = None
-        ts_end = None
+    # Right now, the Google Tasks API can only tolerate a `due` *date*. We upload a time anyway,
+    # but it gets ignored. Anything with *multiple* times is a definite no-no, so we ignore
+    # anything with an end time as well.
+    ts_start = datetime.strptime(item["start"], "%Y-%m-%dT%H:%M:%S") if item["start"] else None
+    ts_end = datetime.strptime(item["end"], "%Y-%m-%dT%H:%M:%S") if item["end"] else None
+    if ts_end:
+        return
 
     task_obj = {
         "title": item["title"],

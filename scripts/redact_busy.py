@@ -1,26 +1,26 @@
 #!/usr/bin/env python
-# A scheduling script that modifies the given array of action items to only those that are
-# events, redacting information about them. This is designed to be used in a calendar pipeline
-# for producing a "busy calendar" which can be shared with others to let them know the user's
-# availability without revealing sensitive information about the user's schedule.
+# A scheduling script that takes in an array of items from `items_to_list`, and redacts all
+# identifying information from them, removing the title, body, and location, and redacting
+# subtasks recursively, leaving only timestamps and IDs intact. This is intended to be used
+# on calendar events to produce a "busy calendar" that can be shared with others without
+# revealing sensitive information about the user's schedule.
 
 import json
 import sys
 
-def redact_events(items):
+def redact_items(items):
     """
-    Returns only those items from the input array which are events, and redacts their information.
-    This will NOT change the ID of each item, as this is only meaningful with reference to data
-    that would reveal the user's schedule anyway.
+    Redacts the information on the given items, leaving only timestamps and IDs intact.
     """
 
     redacted = []
+    # We're working with outputs of `items_to_list.py`
     for item in items:
         # Redact the title and description
         item["title"] = "🔒 BUSY"
         item["body"] = "The details of this event have been redacted for privacy."
         item["location"] = None
-        item["people"] = []
+        item["subtasks"] = redact_items(item["subtasks"])
 
         redacted.append(item)
 
@@ -29,5 +29,5 @@ def redact_events(items):
 if __name__ == "__main__":
     data = json.load(sys.stdin)
 
-    transformed = redact_events(data)
+    transformed = redact_items(data)
     json.dump(transformed, sys.stdout)
