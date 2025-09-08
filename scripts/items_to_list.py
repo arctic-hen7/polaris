@@ -94,8 +94,8 @@ def transform_item(item, earliest_date):
     if item.get("date"):
         # If we've got a `date` property, we're working with something like a daily note, which
         # has very simple timestamp requirements
-        item_date = datetime.strptime(item["date"], "%Y-%m-%d").date()
-        list_item["start"] = item_date.isoformat() if item_date >= earliest_date else earliest_date.isoformat()
+        item_dt = datetime.strptime(item["date"], "%Y-%m-%d")
+        list_item["start"] = item_dt.isoformat() if item_dt.date() >= earliest_date else earliest_date.isoformat()
     else:
         # If we don't have a date, we *probably* have a timestamp
         if item.get("timestamp"):
