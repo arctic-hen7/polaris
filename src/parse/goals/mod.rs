@@ -15,7 +15,7 @@ use std::collections::VecDeque;
 use uuid::Uuid;
 
 /// A list of goals for a single day.
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Goals {
     /// The date for which these goals were extracted.
     date: NaiveDate,
