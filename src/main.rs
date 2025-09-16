@@ -96,7 +96,6 @@ fn main() -> Result<()> {
     handle_items!(PersonDate, person_dates, &views.dates, views_data);
     handle_items!(Stack, stacks, &views.stacks, views_data);
     handle_items!(Waiting, waitings, &views.waits, views_data);
-    handle_items!(PersonDate, person_dates, &views.dates, views_data);
     // We inject extra filters for all the target context views so we can easily iterate over the
     // tasks relevant to them
     let mut target_context_view_names = Vec::with_capacity(views.target_contexts.len());
@@ -200,7 +199,7 @@ fn main() -> Result<()> {
 }
 
 /// The final data for a single view, which may contain multiple data types.
-#[derive(Serialize, Default)]
+#[derive(Serialize, Default, Debug)]
 struct ViewData {
     #[serde(skip_serializing_if = "Option::is_none")]
     events: Option<Vec<Event>>,
